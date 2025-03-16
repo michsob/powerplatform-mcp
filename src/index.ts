@@ -43,6 +43,46 @@ function getPowerPlatformService(): PowerPlatformService {
   return powerPlatformService;
 }
 
+// Pre-defined PowerPlatform Prompts
+const powerPlatformPrompts = {
+  // Entity exploration prompts
+  ENTITY_OVERVIEW: (entityName: string) => 
+    `## Power Platform Entity: ${entityName}\n\n` +
+    `This is an overview of the '${entityName}' entity in Microsoft Power Platform/Dataverse:\n\n` +
+    `### Entity Details\n{{entity_details}}\n\n` +
+    `### Key Attributes\n{{key_attributes}}\n\n` +
+    `### Relationships\n{{relationships}}\n\n` +
+    `You can query this entity using OData filters against the plural name.`,
+
+  ATTRIBUTE_DETAILS: (entityName: string, attributeName: string) =>
+    `## Attribute: ${attributeName}\n\n` +
+    `Details for the '${attributeName}' attribute of the '${entityName}' entity:\n\n` +
+    `{{attribute_details}}\n\n` +
+    `### Usage Notes\n` +
+    `- Data Type: {{data_type}}\n` +
+    `- Required: {{required}}\n` +
+    `- Max Length: {{max_length}}`,
+
+  // Query builder prompts
+  QUERY_TEMPLATE: (entityNamePlural: string) =>
+    `## OData Query Template for ${entityNamePlural}\n\n` +
+    `Use this template to build queries against the ${entityNamePlural} entity:\n\n` +
+    `\`\`\`\n${entityNamePlural}?$select={{selected_fields}}&$filter={{filter_conditions}}&$orderby={{order_by}}&$top={{max_records}}\n\`\`\`\n\n` +
+    `### Common Filter Examples\n` +
+    `- Equals: \`name eq 'Contoso'\`\n` +
+    `- Contains: \`contains(name, 'Contoso')\`\n` +
+    `- Greater than date: \`createdon gt 2023-01-01T00:00:00Z\`\n` +
+    `- Multiple conditions: \`name eq 'Contoso' and statecode eq 0\``,
+
+  // Relationship exploration prompts
+  RELATIONSHIP_MAP: (entityName: string) =>
+    `## Relationship Map for ${entityName}\n\n` +
+    `This shows all relationships for the '${entityName}' entity:\n\n` +
+    `### One-to-Many Relationships (${entityName} as Primary)\n{{one_to_many_primary}}\n\n` +
+    `### One-to-Many Relationships (${entityName} as Related)\n{{one_to_many_related}}\n\n` +
+    `### Many-to-Many Relationships\n{{many_to_many}}\n\n`
+};
+
 // PowerPlatform entity metadata
 server.tool(
   "get-entity-metadata",
@@ -307,6 +347,180 @@ server.tool(
           {
             type: "text",
             text: `Failed to query records: ${error}`,
+          },
+        ],
+      };
+    }
+  }
+);
+
+// PowerPlatform MCP Prompts
+server.tool(
+  "use-powerplatform-prompt",
+  "Use a predefined prompt template for PowerPlatform entities",
+  {
+    promptType: z.enum([
+      "ENTITY_OVERVIEW", 
+      "ATTRIBUTE_DETAILS", 
+      "QUERY_TEMPLATE", 
+      "RELATIONSHIP_MAP"
+    ]).describe("The type of prompt template to use"),
+    entityName: z.string().describe("The logical name of the entity"),
+    attributeName: z.string().optional().describe("The logical name of the attribute (required for ATTRIBUTE_DETAILS prompt)"),
+  },
+  async ({ promptType, entityName, attributeName }) => {
+    try {
+      // Get or initialize PowerPlatformService
+      const service = getPowerPlatformService();
+      
+      let promptContent = "";
+      let replacements: Record<string, string> = {};
+      
+      switch (promptType) {
+        case "ENTITY_OVERVIEW": {
+          // Get entity metadata and key attributes
+          const [metadata, attributes] = await Promise.all([
+            service.getEntityMetadata(entityName),
+            service.getEntityAttributes(entityName)
+          ]);
+          
+          // Format entity details
+          const entityDetails = `- Display Name: ${metadata.DisplayName?.UserLocalizedLabel?.Label || entityName}\n` +
+            `- Schema Name: ${metadata.SchemaName}\n` +
+            `- Description: ${metadata.Description?.UserLocalizedLabel?.Label || 'No description'}\n` +
+            `- Primary Key: ${metadata.PrimaryIdAttribute}\n` +
+            `- Primary Name: ${metadata.PrimaryNameAttribute}`;
+            
+          // Get key attributes
+          const keyAttributes = attributes.value
+            .filter((attr: any) => attr.IsValidForRead === true && !attr.AttributeOf)
+            //.slice(0, 10) // Limit to first 10 important attributes
+            .map((attr: any) => `- ${attr.LogicalName}: ${attr.AttributeType} (${attr.DisplayName?.UserLocalizedLabel?.Label || 'No display name'})`)
+            .join('\n');
+            
+          // Get relationships summary
+          const relationships = await service.getEntityRelationships(entityName);
+          const oneToManyCount = relationships.oneToMany.value.length;
+          const manyToManyCount = relationships.manyToMany.value.length;
+          
+          const relationshipsSummary = `- One-to-Many Relationships: ${oneToManyCount}\n` +
+                                      `- Many-to-Many Relationships: ${manyToManyCount}`;
+          
+          promptContent = powerPlatformPrompts.ENTITY_OVERVIEW(entityName);
+          replacements = {
+            '{{entity_details}}': entityDetails,
+            '{{key_attributes}}': keyAttributes,
+            '{{relationships}}': relationshipsSummary
+          };
+          break;
+        }
+        
+        case "ATTRIBUTE_DETAILS": {
+          if (!attributeName) {
+            throw new Error("attributeName is required for ATTRIBUTE_DETAILS prompt");
+          }
+          
+          // Get attribute details
+          const attribute = await service.getEntityAttribute(entityName, attributeName);
+          
+          // Format attribute details
+          const attrDetails = `- Display Name: ${attribute.DisplayName?.UserLocalizedLabel?.Label || attributeName}\n` +
+            `- Description: ${attribute.Description?.UserLocalizedLabel?.Label || 'No description'}\n` +
+            `- Type: ${attribute.AttributeType}\n` +
+            `- Format: ${attribute.Format || 'N/A'}\n` +
+            `- Is Required: ${attribute.RequiredLevel?.Value || 'No'}\n` +
+            `- Is Searchable: ${attribute.IsValidForAdvancedFind || false}`;
+            
+          promptContent = powerPlatformPrompts.ATTRIBUTE_DETAILS(entityName, attributeName);
+          replacements = {
+            '{{attribute_details}}': attrDetails,
+            '{{data_type}}': attribute.AttributeType,
+            '{{required}}': attribute.RequiredLevel?.Value || 'No',
+            '{{max_length}}': attribute.MaxLength || 'N/A'
+          };
+          break;
+        }
+        
+        case "QUERY_TEMPLATE": {
+          // Get entity metadata to determine plural name
+          const metadata = await service.getEntityMetadata(entityName);
+          const entityNamePlural = metadata.EntitySetName;
+          
+          // Get a few important fields for the select example
+          const attributes = await service.getEntityAttributes(entityName);
+          const selectFields = attributes.value
+            .filter((attr: any) => attr.IsValidForRead === true && !attr.AttributeOf)
+            .slice(0, 5) // Just take first 5 for example
+            .map((attr: any) => attr.LogicalName)
+            .join(',');
+            
+          promptContent = powerPlatformPrompts.QUERY_TEMPLATE(entityNamePlural);
+          replacements = {
+            '{{selected_fields}}': selectFields,
+            '{{filter_conditions}}': `_${metadata.PrimaryNameAttribute} eq 'Example'`,
+            '{{order_by}}': `${metadata.PrimaryNameAttribute} asc`,
+            '{{max_records}}': '50'
+          };
+          break;
+        }
+        
+        case "RELATIONSHIP_MAP": {
+          // Get relationships
+          const relationships = await service.getEntityRelationships(entityName);
+          
+          // Format one-to-many relationships where this entity is primary
+          const oneToManyPrimary = relationships.oneToMany.value
+            .filter((rel: any) => rel.ReferencingEntity !== entityName)
+            //.slice(0, 10) // Limit to 10 for readability
+            .map((rel: any) => `- ${rel.SchemaName}: ${entityName} (1) → ${rel.ReferencingEntity} (N)`)
+            .join('\n');
+            
+          // Format one-to-many relationships where this entity is related
+          const oneToManyRelated = relationships.oneToMany.value
+            .filter((rel: any) => rel.ReferencingEntity === entityName)
+            //.slice(0, 10) // Limit to 10 for readability
+            .map((rel: any) => `- ${rel.SchemaName}: ${rel.ReferencedEntity} (1) → ${entityName} (N)`)
+            .join('\n');
+            
+          // Format many-to-many relationships
+          const manyToMany = relationships.manyToMany.value
+            //.slice(0, 10) // Limit to 10 for readability
+            .map((rel: any) => {
+              const otherEntity = rel.Entity1LogicalName === entityName ? rel.Entity2LogicalName : rel.Entity1LogicalName;
+              return `- ${rel.SchemaName}: ${entityName} (N) ↔ ${otherEntity} (N)`;
+            })
+            .join('\n');
+          
+          promptContent = powerPlatformPrompts.RELATIONSHIP_MAP(entityName);
+          replacements = {
+            '{{one_to_many_primary}}': oneToManyPrimary || 'None found',
+            '{{one_to_many_related}}': oneToManyRelated || 'None found',
+            '{{many_to_many}}': manyToMany || 'None found'
+          };
+          break;
+        }
+      }
+      
+      // Replace all placeholders in the template
+      for (const [placeholder, value] of Object.entries(replacements)) {
+        promptContent = promptContent.replace(placeholder, value);
+      }
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: promptContent,
+          },
+        ],
+      };
+    } catch (error) {
+      console.error("Error using PowerPlatform prompt:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to use PowerPlatform prompt: ${error}`,
           },
         ],
       };
