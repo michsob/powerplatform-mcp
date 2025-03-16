@@ -4,7 +4,7 @@
   "description": "PowerPlatform Model Context Protocol server",
   "main": "build/index.js",
   "bin": {
-    "powerplatform-mcp": "./build/index.js"
+    "powerplatform-mcp": "build/index.js"
   },
   "scripts": {
     "build": "tsc",
