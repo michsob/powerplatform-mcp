@@ -100,7 +100,14 @@ export class PowerPlatformService {
    * @param entityName The logical name of the entity
    */
   async getEntityAttributes(entityName: string): Promise<any> {
-    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`);
+    const selectProperties = [
+      'AttributeType',
+      'EntityLogicalName',
+      'LogicalName',
+      'SchemaName'
+    ].join(',');
+    
+    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=${selectProperties}`);
   }
 
   /**
@@ -117,7 +124,18 @@ export class PowerPlatformService {
    * @param entityName The logical name of the entity
    */
   async getEntityOneToManyRelationships(entityName: string): Promise<any> {
-    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/OneToManyRelationships`);
+    const selectProperties = [
+      'SchemaName',
+      'RelationshipType',
+      'ReferencedAttribute',
+      'ReferencedEntity',
+      'ReferencingAttribute',
+      'ReferencingEntity',
+      'ReferencedEntityNavigationPropertyName',
+      'ReferencingEntityNavigationPropertyName'
+    ].join(',');
+    
+    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/OneToManyRelationships?$select=${selectProperties}`);
   }
 
   /**
@@ -125,7 +143,18 @@ export class PowerPlatformService {
    * @param entityName The logical name of the entity
    */
   async getEntityManyToManyRelationships(entityName: string): Promise<any> {
-    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/ManyToManyRelationships`);
+    const selectProperties = [
+      'SchemaName',
+      'RelationshipType',
+      'Entity1LogicalName',
+      'Entity2LogicalName',
+      'Entity1IntersectAttribute',
+      'Entity2IntersectAttribute',
+      'Entity1NavigationPropertyName',
+      'Entity2NavigationPropertyName'
+    ].join(',');
+    
+    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/ManyToManyRelationships?$select=${selectProperties}`);
   }
 
   /**
