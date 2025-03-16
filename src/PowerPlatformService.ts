@@ -8,6 +8,12 @@ export interface PowerPlatformConfig {
   tenantId: string;
 }
 
+// Interface for API responses with value collections
+export interface ApiCollectionResponse<T> {
+  value: T[];
+  [key: string]: any; // For any additional properties
+}
+
 export class PowerPlatformService {
   private config: PowerPlatformConfig;
   private msalClient: ConfidentialClientApplication;
@@ -101,13 +107,10 @@ export class PowerPlatformService {
    */
   async getEntityAttributes(entityName: string): Promise<any> {
     const selectProperties = [
-      'AttributeType',
-      'EntityLogicalName',
       'LogicalName',
-      'SchemaName'
     ].join(',');
     
-    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=${selectProperties}`);
+    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=${selectProperties}&$filter=AttributeType ne 'Virtual'`);
   }
 
   /**
@@ -123,7 +126,7 @@ export class PowerPlatformService {
    * Get one-to-many relationships for an entity
    * @param entityName The logical name of the entity
    */
-  async getEntityOneToManyRelationships(entityName: string): Promise<any> {
+  async getEntityOneToManyRelationships(entityName: string): Promise<ApiCollectionResponse<any>> {
     const selectProperties = [
       'SchemaName',
       'RelationshipType',
@@ -135,14 +138,25 @@ export class PowerPlatformService {
       'ReferencingEntityNavigationPropertyName'
     ].join(',');
     
-    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/OneToManyRelationships?$select=${selectProperties}`);
+    // Only filter by ReferencingAttribute in the OData query since startswith isn't supported
+    const response = await this.makeRequest<ApiCollectionResponse<any>>(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/OneToManyRelationships?$select=${selectProperties}&$filter=ReferencingAttribute ne 'regardingobjectid'`);
+    
+    // Filter the response to exclude relationships with ReferencingEntity starting with 'msdyn_' or 'adx_'
+    if (response && response.value) {
+      response.value = response.value.filter((relationship: any) => {
+        const referencingEntity = relationship.ReferencingEntity || '';
+        return !(referencingEntity.startsWith('msdyn_') || referencingEntity.startsWith('adx_'));
+      });
+    }
+    
+    return response;
   }
 
   /**
    * Get many-to-many relationships for an entity
    * @param entityName The logical name of the entity
    */
-  async getEntityManyToManyRelationships(entityName: string): Promise<any> {
+  async getEntityManyToManyRelationships(entityName: string): Promise<ApiCollectionResponse<any>> {
     const selectProperties = [
       'SchemaName',
       'RelationshipType',
@@ -154,14 +168,14 @@ export class PowerPlatformService {
       'Entity2NavigationPropertyName'
     ].join(',');
     
-    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/ManyToManyRelationships?$select=${selectProperties}`);
+    return this.makeRequest<ApiCollectionResponse<any>>(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/ManyToManyRelationships?$select=${selectProperties}`);
   }
 
   /**
    * Get all relationships (one-to-many and many-to-many) for an entity
    * @param entityName The logical name of the entity
    */
-  async getEntityRelationships(entityName: string): Promise<{oneToMany: any, manyToMany: any}> {
+  async getEntityRelationships(entityName: string): Promise<{oneToMany: ApiCollectionResponse<any>, manyToMany: ApiCollectionResponse<any>}> {
     const [oneToMany, manyToMany] = await Promise.all([
       this.getEntityOneToManyRelationships(entityName),
       this.getEntityManyToManyRelationships(entityName)
@@ -199,7 +213,7 @@ export class PowerPlatformService {
    * @param maxRecords Maximum number of records to retrieve (default: 50)
    * @returns Filtered list of records
    */
-  async queryRecords(entityNamePlural: string, filter: string, maxRecords: number = 50): Promise<any> {
-    return this.makeRequest(`api/data/v9.2/${entityNamePlural}?$filter=${encodeURIComponent(filter)}&$top=${maxRecords}`);
+  async queryRecords(entityNamePlural: string, filter: string, maxRecords: number = 50): Promise<ApiCollectionResponse<any>> {
+    return this.makeRequest<ApiCollectionResponse<any>>(`api/data/v9.2/${entityNamePlural}?$filter=${encodeURIComponent(filter)}&$top=${maxRecords}`);
   }
 }

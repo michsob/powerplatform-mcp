@@ -1,6 +1,6 @@
 {
   "name": "powerplatform-mcp",
-  "version": "0.3.0",
+  "version": "0.4.2",
   "description": "PowerPlatform Model Context Protocol server",
   "main": "build/index.js",
   "bin": {
