@@ -102,4 +102,75 @@ export class PowerPlatformService {
   async getEntityAttributes(entityName: string): Promise<any> {
     return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`);
   }
+
+  /**
+   * Get metadata about a specific entity attribute/field
+   * @param entityName The logical name of the entity
+   * @param attributeName The logical name of the attribute
+   */
+  async getEntityAttribute(entityName: string, attributeName: string): Promise<any> {
+    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes(LogicalName='${attributeName}')`);
+  }
+
+  /**
+   * Get one-to-many relationships for an entity
+   * @param entityName The logical name of the entity
+   */
+  async getEntityOneToManyRelationships(entityName: string): Promise<any> {
+    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/OneToManyRelationships`);
+  }
+
+  /**
+   * Get many-to-many relationships for an entity
+   * @param entityName The logical name of the entity
+   */
+  async getEntityManyToManyRelationships(entityName: string): Promise<any> {
+    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/ManyToManyRelationships`);
+  }
+
+  /**
+   * Get all relationships (one-to-many and many-to-many) for an entity
+   * @param entityName The logical name of the entity
+   */
+  async getEntityRelationships(entityName: string): Promise<{oneToMany: any, manyToMany: any}> {
+    const [oneToMany, manyToMany] = await Promise.all([
+      this.getEntityOneToManyRelationships(entityName),
+      this.getEntityManyToManyRelationships(entityName)
+    ]);
+    
+    return {
+      oneToMany,
+      manyToMany
+    };
+  }
+
+  /**
+   * Get a global option set definition by name
+   * @param optionSetName The name of the global option set
+   * @returns The global option set definition
+   */
+  async getGlobalOptionSet(optionSetName: string): Promise<any> {
+    return this.makeRequest(`api/data/v9.2/GlobalOptionSetDefinitions(Name='${optionSetName}')`);
+  }
+
+  /**
+   * Get a specific record by entity name (plural) and ID
+   * @param entityNamePlural The plural name of the entity (e.g., 'accounts', 'contacts')
+   * @param recordId The GUID of the record
+   * @returns The record data
+   */
+  async getRecord(entityNamePlural: string, recordId: string): Promise<any> {
+    return this.makeRequest(`api/data/v9.2/${entityNamePlural}(${recordId})`);
+  }
+
+  /**
+   * Query records using entity name (plural) and a filter expression
+   * @param entityNamePlural The plural name of the entity (e.g., 'accounts', 'contacts')
+   * @param filter OData filter expression (e.g., "name eq 'test'")
+   * @param maxRecords Maximum number of records to retrieve (default: 50)
+   * @returns Filtered list of records
+   */
+  async queryRecords(entityNamePlural: string, filter: string, maxRecords: number = 50): Promise<any> {
+    return this.makeRequest(`api/data/v9.2/${entityNamePlural}?$filter=${encodeURIComponent(filter)}&$top=${maxRecords}`);
+  }
 }
