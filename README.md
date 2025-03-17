@@ -1,6 +1,6 @@
 # PowerPlatform MCP Server
 
-A Model Context Protocol (MCP) server that provides intelligent access to PowerPlatform/Dataverse entities and records. This tool offers comprehensive entity exploration, metadata access, and AI-assisted query capabilities through GitHub Copilot integration.
+A Model Context Protocol (MCP) server that provides intelligent access to PowerPlatform/Dataverse entities and records. This tool offers context-aware assistance, entity exploration and metadata access.
 
 Key features:
 - Rich entity metadata exploration with formatted, context-aware prompts
@@ -8,8 +8,6 @@ Key features:
 - Comprehensive relationship mapping and visualization
 - AI-assisted query building and data modeling through AI agent
 - Full access to entity attributes, relationships, and global option sets
-
-Perfect for developers working with PowerPlatform/Dataverse who want intelligent, context-aware assistance for entity exploration and data querying.
 
 ## Installation
 
@@ -49,7 +47,7 @@ POWERPLATFORM_TENANT_ID=your-azure-tenant-id
 
 ## Usage
 
-This is an MCP server designed to work with MCP-compatible clients like GitHub Copilot. Once running, it will expose tools for retrieving PowerPlatform entity metadata.
+This is an MCP server designed to work with MCP-compatible clients like Cursor, Claude App and GitHub Copilot. Once running, it will expose tools for retrieving PowerPlatform entity metadata and records.
 
 ### Available Tools
 
@@ -64,7 +62,7 @@ This is an MCP server designed to work with MCP-compatible clients like GitHub C
 
 ## MCP Prompts
 
-The server includes a prompts feature that provides formatted, context-rich information about PowerPlatform entities. These prompts are ideal for use with AI assistants like GitHub Copilot.
+The server includes a prompts feature that provides formatted, context-rich information about PowerPlatform entities.
 
 ### Available Prompt Types
 
@@ -205,22 +203,18 @@ This shows all relationships for the 'contact' entity:
 - contactquotes_association: contact (N) ↔ quote (N)
 ```
 
-## Integration with AI Assistants
+## Prompt Examples
 
-These prompts are particularly valuable when used with AI assistants like GitHub Copilot that can integrate with MCP.
+Here are some examples of how you can interact with assistant using the PowerPlatform MCP prompts:
 
-### GitHub Copilot Examples
+### 1. Entity Understanding
 
-Here are some examples of how you can interact with GitHub Copilot using the PowerPlatform MCP prompts:
-
-#### 1. Entity Understanding
-
-You can ask GitHub Copilot about entities in natural language:
+You can ask assistant about entities in natural language:
 
 ```
 User: "Tell me about the Account entity in our PowerPlatform environment"
 
-GitHub Copilot: Let me fetch the entity overview for you...
+Response:
 [uses ENTITY_OVERVIEW prompt internally]
 
 Here's what I found about the Account entity:
@@ -234,14 +228,14 @@ Here's what I found about the Account entity:
 - It has 42 one-to-many relationships and 8 many-to-many relationships
 ```
 
-#### 2. Building Queries
+### 2. Building Queries
 
 You can ask for help constructing queries:
 
 ```
 User: "Help me write a query to find active accounts with revenue over $1M in California"
 
-GitHub Copilot: I'll help you build that query...
+Response:
 [uses QUERY_TEMPLATE prompt internally]
 
 Here's the OData query you need:
@@ -259,14 +253,14 @@ This query:
 5. Orders by revenue highest to lowest
 ```
 
-#### 3. Understanding Relationships
+### 3. Understanding Relationships
 
 You can explore entity relationships naturally:
 
 ```
 User: "How are Accounts and Contacts related in our system?"
 
-GitHub Copilot: Let me check the relationship maps...
+Response:
 [uses RELATIONSHIP_MAP prompt for both entities internally]
 
 Here are the key relationships between Accounts and Contacts:
@@ -284,14 +278,14 @@ Here are the key relationships between Accounts and Contacts:
    - account_connections: For relationship management
 ```
 
-#### 4. Field/Attribute Investigation
+### 4. Field/Attribute Investigation
 
 You can ask about specific fields:
 
 ```
 User: "What kind of field is the revenue field on Account?"
 
-GitHub Copilot: Let me check the attribute details...
+Response:
 [uses ATTRIBUTE_DETAILS prompt internally]
 
 The revenue field on Account is:
@@ -303,14 +297,14 @@ The revenue field on Account is:
 - Can be used in advanced find and filtered views
 ```
 
-#### 5. Complex Data Modeling
+### 5. Complex Data Modeling
 
 You can get help with data modeling decisions:
 
 ```
 User: "I need to design a solution for tracking product reviews. Which entities should I relate to?"
 
-GitHub Copilot: Let me analyze the relevant entities...
+Response:
 [uses multiple ENTITY_OVERVIEW and RELATIONSHIP_MAP prompts internally]
 
 Based on the existing data model, here's a suggested approach:
@@ -330,14 +324,14 @@ Here's a sample lookup field structure...
 [continues with detailed implementation guidance]
 ```
 
-#### 6. Debugging Assistance
+### 6. Debugging Assistance
 
 You can get help troubleshooting:
 
 ```
 User: "Why am I getting 'invalid property' when querying account.customertypecode?"
 
-GitHub Copilot: Let me check the attribute details...
+Response:
 [uses ATTRIBUTE_DETAILS prompt internally]
 
 I see the issue. The field 'customertypecode' is actually named 'customertype' in your environment. Here's the correct field information:
@@ -354,7 +348,7 @@ I see the issue. The field 'customertypecode' is actually named 'customertype' i
 Try updating your query to use 'customertype' instead of 'customertypecode'.
 ```
 
-These examples show how GitHub Copilot can leverage the MCP prompts to provide context-aware, accurate assistance for PowerPlatform development tasks. The AI understands your environment's specific configuration and can help with both simple queries and complex architectural decisions.
+These examples show how AI assistant can leverage the MCP prompts to provide context-aware, accurate assistance for PowerPlatform development tasks. The AI understands your environment's specific configuration and can help with both simple queries and complex architectural decisions.
 
 ## License
 
