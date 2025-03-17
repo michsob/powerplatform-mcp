@@ -111,8 +111,10 @@ server.prompt(
         
       // Get key attributes
       const keyAttributes = attributes.value
-        .filter((attr: any) => attr.IsValidForRead === true && !attr.AttributeOf)
-        .map((attr: any) => `- ${attr.LogicalName}: ${attr.AttributeType} (${attr.DisplayName?.UserLocalizedLabel?.Label || 'No display name'})`)
+        .map((attr: any) => {
+          const attrType = attr["@odata.type"] || attr.odata?.type || "Unknown type";
+          return `- ${attr.LogicalName}: ${attrType}`;
+        })
         .join('\n');
         
       // Get relationships summary
@@ -654,9 +656,11 @@ server.tool(
             
           // Get key attributes
           const keyAttributes = attributes.value
-            .filter((attr: any) => attr.IsValidForRead === true && !attr.AttributeOf)
             //.slice(0, 10) // Limit to first 10 important attributes
-            .map((attr: any) => `- ${attr.LogicalName}: ${attr.AttributeType} (${attr.DisplayName?.UserLocalizedLabel?.Label || 'No display name'})`)
+            .map((attr: any) => {
+                const attrType = attr["@odata.type"] || attr.odata?.type || "Unknown type";
+                return `- ${attr.LogicalName}: ${attrType}`;
+              })
             .join('\n');
             
           // Get relationships summary
@@ -710,7 +714,6 @@ server.tool(
           // Get a few important fields for the select example
           const attributes = await service.getEntityAttributes(entityName);
           const selectFields = attributes.value
-            .filter((attr: any) => attr.IsValidForRead === true && !attr.AttributeOf)
             .slice(0, 5) // Just take first 5 for example
             .map((attr: any) => attr.LogicalName)
             .join(',');

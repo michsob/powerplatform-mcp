@@ -98,7 +98,14 @@ export class PowerPlatformService {
    * @param entityName The logical name of the entity
    */
   async getEntityMetadata(entityName: string): Promise<any> {
-    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')`);
+    const response = await this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')`);
+    
+    // Remove Privileges property if it exists
+    if (response && typeof response === 'object' && 'Privileges' in response) {
+      delete response.Privileges;
+    }
+    
+    return response;
   }
 
   /**
