@@ -105,12 +105,49 @@ export class PowerPlatformService {
    * Get metadata about entity attributes/fields
    * @param entityName The logical name of the entity
    */
-  async getEntityAttributes(entityName: string): Promise<any> {
+  async getEntityAttributes(entityName: string): Promise<ApiCollectionResponse<any>> {
     const selectProperties = [
       'LogicalName',
     ].join(',');
     
-    return this.makeRequest(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=${selectProperties}&$filter=AttributeType ne 'Virtual'`);
+    // Make the request to get attributes
+    const response = await this.makeRequest<ApiCollectionResponse<any>>(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=${selectProperties}&$filter=AttributeType ne 'Virtual'`);
+    
+    if (response && response.value) {
+      // First pass: Filter out attributes that end with 'yominame'
+      response.value = response.value.filter((attribute: any) => {
+        const logicalName = attribute.LogicalName || '';
+        return !logicalName.endsWith('yominame');
+      });
+      
+      // Filter out attributes that end with 'name' if there is another attribute with the same name without the 'name' suffix
+      const baseNames = new Set<string>();
+      const namesAttributes = new Map<string, any>();
+      
+      for (const attribute of response.value) {
+        const logicalName = attribute.LogicalName || '';
+      
+        if (logicalName.endsWith('name') && logicalName.length > 4) {
+          const baseName = logicalName.slice(0, -4); // Remove 'name' suffix
+          namesAttributes.set(baseName, attribute);
+        } else {
+          // This is a potential base attribute
+          baseNames.add(logicalName);
+        }
+      }
+      
+      // Find attributes to remove that match the pattern
+      const attributesToRemove = new Set<any>();
+      for (const [baseName, nameAttribute] of namesAttributes.entries()) {
+        if (baseNames.has(baseName)) {
+          attributesToRemove.add(nameAttribute);
+        }
+      }
+
+      response.value = response.value.filter(attribute => !attributesToRemove.has(attribute));
+    }
+    
+    return response;
   }
 
   /**
