@@ -141,3 +141,6 @@ dist
 
 # Visual Studio Code
 .vs
+.playwright-mcp
+.claude
+Claude.md

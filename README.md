@@ -45,6 +45,26 @@ POWERPLATFORM_CLIENT_SECRET=your-azure-app-client-secret
 POWERPLATFORM_TENANT_ID=your-azure-tenant-id
 ```
 
+### For Development
+
+1. Clone the repository and install dependencies:
+   ```bash
+   git clone https://github.com/michsob/powerplatform-mcp.git
+   cd powerplatform-mcp
+   npm install
+   ```
+
+2. Copy `.env.example` to `.env` and fill in your credentials:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Build and test:
+   ```bash
+   npm run build
+   npm run inspector:debug
+   ```
+
 ## Usage
 
 This is an MCP server designed to work with MCP-compatible clients like Cursor, Claude App and GitHub Copilot. Once running, it will expose tools for retrieving PowerPlatform entity metadata and records.
