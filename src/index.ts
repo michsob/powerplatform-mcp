@@ -2,7 +2,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { PowerPlatformClient, PowerPlatformConfig } from "./PowerPlatformClient.js";
-import { EntityService, RecordService, OptionSetService } from "./services/index.js";
+import { EntityService, RecordService, OptionSetService, PluginService } from "./services/index.js";
 import { registerAllTools } from "./tools/index.js";
 import { registerAllPrompts } from "./prompts/index.js";
 import type { ServiceContext } from "./types.js";
@@ -26,6 +26,7 @@ let powerPlatformClient: PowerPlatformClient | null = null;
 let entityService: EntityService | null = null;
 let recordService: RecordService | null = null;
 let optionSetService: OptionSetService | null = null;
+let pluginService: PluginService | null = null;
 
 // Function to initialize the PowerPlatform client on demand
 function getClient(): PowerPlatformClient {
@@ -72,11 +73,19 @@ function getOptionSetService(): OptionSetService {
   return optionSetService;
 }
 
+function getPluginService(): PluginService {
+  if (!pluginService) {
+    pluginService = new PluginService(getClient());
+  }
+  return pluginService;
+}
+
 // Create service context for tools and prompts
 const ctx: ServiceContext = {
   getEntityService,
   getRecordService,
   getOptionSetService,
+  getPluginService,
 };
 
 // Register all tools and prompts

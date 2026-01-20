@@ -1,10 +1,5 @@
 import { PowerPlatformClient } from '../PowerPlatformClient.js';
-
-// Interface for API responses with value collections
-export interface ApiCollectionResponse<T> {
-  value: T[];
-  [key: string]: any;
-}
+import type { ApiCollectionResponse } from '../models/index.js';
 
 /**
  * Service for entity metadata operations.

@@ -1,5 +1,5 @@
 import { PowerPlatformClient } from '../PowerPlatformClient.js';
-import { ApiCollectionResponse } from './EntityService.js';
+import type { ApiCollectionResponse } from '../models/index.js';
 
 /**
  * Service for record operations.

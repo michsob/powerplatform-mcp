@@ -340,33 +340,8 @@ Based on the existing data model, here's a suggested approach:
    - Contact (N:1) - Reviews are written by contacts
    - Account (N:1) - Optional link to company if B2B review
 
-Here's a sample lookup field structure...
-[continues with detailed implementation guidance]
-```
 
-### 6. Debugging Assistance
 
-You can get help troubleshooting:
-
-```
-User: "Why am I getting 'invalid property' when querying account.customertypecode?"
-
-Response:
-[uses ATTRIBUTE_DETAILS prompt internally]
-
-I see the issue. The field 'customertypecode' is actually named 'customertype' in your environment. Here's the correct field information:
-- Logical Name: customertype
-- Type: OptionSetValue
-- Valid Values:
-  * 1 = Competitor
-  * 2 = Consultant
-  * 3 = Customer
-  * 4 = Investor
-  * 5 = Partner
-  * 6 = Influencer
-
-Try updating your query to use 'customertype' instead of 'customertypecode'.
-```
 
 These examples show how AI assistant can leverage the MCP prompts to provide context-aware, accurate assistance for PowerPlatform development tasks. The AI understands your environment's specific configuration and can help with both simple queries and complex architectural decisions.
 
