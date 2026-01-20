@@ -2,6 +2,10 @@
 
 A Model Context Protocol (MCP) server that provides intelligent access to PowerPlatform/Dataverse entities and records. This tool offers context-aware assistance, entity exploration and metadata access.
 
+<a href="https://glama.ai/mcp/servers/@michsob/powerplatform-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@michsob/powerplatform-mcp/badge" alt="PowerPlatform MCP server" />
+</a>
+
 Key features:
 - Rich entity metadata exploration with formatted, context-aware prompts
 - Advanced OData query support with intelligent filtering
