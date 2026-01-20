@@ -51,6 +51,26 @@ POWERPLATFORM_CLIENT_SECRET=your-azure-app-client-secret
 POWERPLATFORM_TENANT_ID=your-azure-tenant-id
 ```
 
+### For Development
+
+1. Clone the repository and install dependencies:
+   ```bash
+   git clone https://github.com/michsob/powerplatform-mcp.git
+   cd powerplatform-mcp
+   npm install
+   ```
+
+2. Copy `.env.example` to `.env` and fill in your credentials:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Build and test:
+   ```bash
+   npm run build
+   npm run inspector:debug
+   ```
+
 ## Usage
 
 This is an MCP server designed to work with MCP-compatible clients like Cursor, Claude App and GitHub Copilot. Once running, it will expose tools for retrieving PowerPlatform entity metadata and records.
@@ -326,33 +346,8 @@ Based on the existing data model, here's a suggested approach:
    - Contact (N:1) - Reviews are written by contacts
    - Account (N:1) - Optional link to company if B2B review
 
-Here's a sample lookup field structure...
-[continues with detailed implementation guidance]
-```
 
-### 6. Debugging Assistance
 
-You can get help troubleshooting:
-
-```
-User: "Why am I getting 'invalid property' when querying account.customertypecode?"
-
-Response:
-[uses ATTRIBUTE_DETAILS prompt internally]
-
-I see the issue. The field 'customertypecode' is actually named 'customertype' in your environment. Here's the correct field information:
-- Logical Name: customertype
-- Type: OptionSetValue
-- Valid Values:
-  * 1 = Competitor
-  * 2 = Consultant
-  * 3 = Customer
-  * 4 = Investor
-  * 5 = Partner
-  * 6 = Influencer
-
-Try updating your query to use 'customertype' instead of 'customertypecode'.
-```
 
 These examples show how AI assistant can leverage the MCP prompts to provide context-aware, accurate assistance for PowerPlatform development tasks. The AI understands your environment's specific configuration and can help with both simple queries and complex architectural decisions.
 
