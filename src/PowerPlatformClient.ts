@@ -99,4 +99,33 @@ export class PowerPlatformClient {
       throw new Error(`PowerPlatform API request failed: ${error}`);
     }
   }
+
+  /**
+   * Make an authenticated POST request to the PowerPlatform API
+   * @param endpoint The API endpoint (relative to organization URL)
+   * @param data The request body
+   */
+  async post<T>(endpoint: string, data?: unknown): Promise<T> {
+    try {
+      const token = await this.getAccessToken();
+
+      const response = await axios({
+        method: 'POST',
+        url: `${this.config.organizationUrl}/${endpoint}`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0'
+        },
+        data
+      });
+
+      return response.data as T;
+    } catch (error) {
+      console.error('PowerPlatform API POST request failed:', error);
+      throw new Error(`PowerPlatform API POST request failed: ${error}`);
+    }
+  }
 }
