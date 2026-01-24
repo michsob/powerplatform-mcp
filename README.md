@@ -2,6 +2,8 @@
 
 # PowerPlatform MCP Server
 
+[![smithery badge](https://smithery.ai/badge/@michsob/powerplatform-mcp)](https://smithery.ai/server/@michsob/powerplatform-mcp)
+
 A Model Context Protocol (MCP) server that provides intelligent access to PowerPlatform/Dataverse entities and records. This tool offers context-aware assistance, entity exploration and metadata access.
 
 <a href="https://glama.ai/mcp/servers/@michsob/powerplatform-mcp">
@@ -18,6 +20,14 @@ Key features:
 ## Installation
 
 You can install and run this tool in two ways:
+
+### Installing via Smithery
+
+To install PowerPlatform MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@michsob/powerplatform-mcp):
+
+```bash
+npx -y @smithery/cli install @michsob/powerplatform-mcp --client claude
+```
 
 ### Option 1: Install globally
 
