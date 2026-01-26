@@ -6,6 +6,7 @@ export interface PowerPlatformConfig {
   clientId: string;
   clientSecret: string;
   tenantId: string;
+  authorityUrl?: string; // Optional: Custom authority URL for national clouds (e.g., https://login.microsoftonline.us for GCC High)
 }
 
 /**
@@ -23,11 +24,13 @@ export class PowerPlatformClient {
     this.config = config;
 
     // Initialize MSAL client
+    // Use custom authority URL if provided (for national clouds), otherwise use default
+    const authorityBaseUrl = this.config.authorityUrl || 'https://login.microsoftonline.com';
     this.msalClient = new ConfidentialClientApplication({
       auth: {
         clientId: this.config.clientId,
         clientSecret: this.config.clientSecret,
-        authority: `https://login.microsoftonline.com/${this.config.tenantId}`,
+        authority: `${authorityBaseUrl}/${this.config.tenantId}`,
       }
     });
   }
