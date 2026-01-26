@@ -13,6 +13,7 @@ const POWERPLATFORM_CONFIG: PowerPlatformConfig = {
   clientId: process.env.POWERPLATFORM_CLIENT_ID || "",
   clientSecret: process.env.POWERPLATFORM_CLIENT_SECRET || "",
   tenantId: process.env.POWERPLATFORM_TENANT_ID || "",
+  authorityUrl: process.env.POWERPLATFORM_AUTHORITY_URL, // Optional: for national clouds
 };
 
 // Create server instance

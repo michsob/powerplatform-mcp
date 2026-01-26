@@ -51,6 +51,23 @@ POWERPLATFORM_CLIENT_SECRET=your-azure-app-client-secret
 POWERPLATFORM_TENANT_ID=your-azure-tenant-id
 ```
 
+### National Cloud Support
+
+To authenticate to national clouds like GCC High, set the optional `POWERPLATFORM_AUTHORITY_URL` environment variable:
+
+```bash
+# For GCC High
+POWERPLATFORM_AUTHORITY_URL=https://login.microsoftonline.us
+
+# For Azure China
+POWERPLATFORM_AUTHORITY_URL=https://login.chinacloudapi.cn
+
+# For Azure Germany
+POWERPLATFORM_AUTHORITY_URL=https://login.microsoftonline.de
+```
+
+If not specified, the default Azure public cloud authority (`https://login.microsoftonline.com`) will be used.
+
 ### For Development
 
 1. Clone the repository and install dependencies:
