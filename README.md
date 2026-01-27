@@ -88,6 +88,22 @@ If not specified, the default Azure public cloud authority (`https://login.micro
    npm run inspector
    ```
 
+## Development Workflow (TDD + Integration Tests)
+
+We use test-driven development (TDD) and rely heavily on integration-style Jest tests that exercise real services through `PowerPlatformClient`.
+
+1. Set up your environment variables in `.env` (see Configuration above).
+2. Write or update an integration test first in `tests/`.
+3. Run the tests:
+   - `npm test` (single run)
+   - `npm run test:watch` (TDD loop)
+   - `npm run test:coverage` (coverage report)
+4. Implement the minimal code needed in `src/` to make the test pass.
+5. Refactor safely with the test suite green.
+
+Notes:
+- Most tests in `tests/services/*.test.ts` are integration tests and will call the Dataverse Web API. Use a dedicated dev environment and avoid pointing at production.
+- When adding features, prefer extending service-level tests first (for example, `tests/services/EntityService.test.ts`) and then wire up tools/prompts.
 ## Usage
 
 This is an MCP server designed to work with MCP-compatible clients like Cursor, Claude App and GitHub Copilot. Once running, it will expose tools for retrieving PowerPlatform entity metadata and records.
