@@ -37,6 +37,7 @@ export function registerEntityTools(server: McpServer, ctx: ServiceContext): voi
       } catch (error: any) {
         console.error("Error getting entity metadata:", error);
         return {
+          structuredContent: { entityName, metadata: null },
           content: [
             {
               type: "text",
@@ -79,6 +80,7 @@ export function registerEntityTools(server: McpServer, ctx: ServiceContext): voi
       } catch (error: any) {
         console.error("Error getting entity attributes:", error);
         return {
+          structuredContent: { entityName, attributes: null },
           content: [
             {
               type: "text",
@@ -123,6 +125,7 @@ export function registerEntityTools(server: McpServer, ctx: ServiceContext): voi
       } catch (error: any) {
         console.error("Error getting entity attribute:", error);
         return {
+          structuredContent: { entityName, attributeName, attribute: null },
           content: [
             {
               type: "text",
@@ -165,6 +168,7 @@ export function registerEntityTools(server: McpServer, ctx: ServiceContext): voi
       } catch (error: any) {
         console.error("Error getting entity relationships:", error);
         return {
+          structuredContent: { entityName, relationships: null },
           content: [
             {
               type: "text",

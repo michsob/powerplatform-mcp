@@ -38,6 +38,7 @@ export function registerPluginTools(server: McpServer, ctx: ServiceContext): voi
       } catch (error: any) {
         console.error("Error getting plugin assemblies:", error);
         return {
+          structuredContent: { totalCount: 0, assemblies: null },
           content: [
             {
               type: "text",
@@ -87,6 +88,7 @@ export function registerPluginTools(server: McpServer, ctx: ServiceContext): voi
       } catch (error: any) {
         console.error("Error getting plugin assembly:", error);
         return {
+          structuredContent: { assembly: null, pluginTypes: [], steps: [], validation: { potentialIssues: [] } },
           content: [
             {
               type: "text",
@@ -137,6 +139,7 @@ export function registerPluginTools(server: McpServer, ctx: ServiceContext): voi
       } catch (error: any) {
         console.error("Error getting entity plugin pipeline:", error);
         return {
+          structuredContent: { entity: entityName, messages: [], steps: [], executionOrder: [] },
           content: [
             {
               type: "text",
@@ -198,6 +201,7 @@ export function registerPluginTools(server: McpServer, ctx: ServiceContext): voi
       } catch (error: any) {
         console.error("Error getting plugin trace logs:", error);
         return {
+          structuredContent: { totalCount: 0, logs: [] },
           content: [
             {
               type: "text",

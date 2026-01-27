@@ -85,7 +85,7 @@ If not specified, the default Azure public cloud authority (`https://login.micro
 3. Build and test:
    ```bash
    npm run build
-   npm run inspector:debug
+   npm run inspector
    ```
 
 ## Usage

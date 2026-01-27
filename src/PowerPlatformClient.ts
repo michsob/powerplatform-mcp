@@ -97,18 +97,33 @@ export class PowerPlatformClient {
       });
 
       return response.data as T;
-    } catch (error) {
-      console.error('PowerPlatform API request failed:', error);
-      throw new Error(`PowerPlatform API request failed: ${error}`);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error?.message || error.message || String(error);
+      console.error('PowerPlatform API request failed:', errorMessage);
+      throw new Error(`PowerPlatform API request failed: ${errorMessage}`);
     }
+  }
+
+  /**
+   * Additional headers for customization requests
+   */
+  private buildHeaders(extraHeaders?: Record<string, string>): Record<string, string> {
+    return {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'OData-MaxVersion': '4.0',
+      'OData-Version': '4.0',
+      ...extraHeaders
+    };
   }
 
   /**
    * Make an authenticated POST request to the PowerPlatform API
    * @param endpoint The API endpoint (relative to organization URL)
    * @param data The request body
+   * @param extraHeaders Additional headers (e.g., MSCRM.SolutionUniqueName)
    */
-  async post<T>(endpoint: string, data?: unknown): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
     try {
       const token = await this.getAccessToken();
 
@@ -117,18 +132,108 @@ export class PowerPlatformClient {
         url: `${this.config.organizationUrl}/${endpoint}`,
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'OData-MaxVersion': '4.0',
-          'OData-Version': '4.0'
+          ...this.buildHeaders(extraHeaders)
+        },
+        data
+      });
+
+      // For metadata creation, extract ID from OData-EntityId header if body is empty
+      if (!response.data || Object.keys(response.data).length === 0) {
+        const entityIdHeader = response.headers['odata-entityid'];
+        if (entityIdHeader) {
+          // Extract GUID from header like: https://org.crm.dynamics.com/api/data/v9.2/EntityDefinitions(guid)
+          const match = entityIdHeader.match(/\(([^)]+)\)$/);
+          if (match) {
+            return { MetadataId: match[1] } as T;
+          }
+        }
+      }
+
+      return response.data as T;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error?.message || error.message || String(error);
+      console.error('PowerPlatform API POST request failed:', errorMessage);
+      throw new Error(`PowerPlatform API POST request failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Make an authenticated PUT request to the PowerPlatform API
+   * @param endpoint The API endpoint (relative to organization URL)
+   * @param data The request body
+   * @param extraHeaders Additional headers (e.g., MSCRM.MergeLabels)
+   */
+  async put<T>(endpoint: string, data: unknown, extraHeaders?: Record<string, string>): Promise<T> {
+    try {
+      const token = await this.getAccessToken();
+
+      const response = await axios({
+        method: 'PUT',
+        url: `${this.config.organizationUrl}/${endpoint}`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          ...this.buildHeaders(extraHeaders)
         },
         data
       });
 
       return response.data as T;
-    } catch (error) {
-      console.error('PowerPlatform API POST request failed:', error);
-      throw new Error(`PowerPlatform API POST request failed: ${error}`);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error?.message || error.message || String(error);
+      console.error('PowerPlatform API PUT request failed:', errorMessage);
+      throw new Error(`PowerPlatform API PUT request failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Make an authenticated PATCH request to the PowerPlatform API
+   * @param endpoint The API endpoint (relative to organization URL)
+   * @param data The request body
+   * @param extraHeaders Additional headers (e.g., MSCRM.SolutionUniqueName)
+   */
+  async patch<T>(endpoint: string, data: unknown, extraHeaders?: Record<string, string>): Promise<T> {
+    try {
+      const token = await this.getAccessToken();
+
+      const response = await axios({
+        method: 'PATCH',
+        url: `${this.config.organizationUrl}/${endpoint}`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          ...this.buildHeaders(extraHeaders)
+        },
+        data
+      });
+
+      return response.data as T;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error?.message || error.message || String(error);
+      console.error('PowerPlatform API PATCH request failed:', errorMessage);
+      throw new Error(`PowerPlatform API PATCH request failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Make an authenticated DELETE request to the PowerPlatform API
+   * @param endpoint The API endpoint (relative to organization URL)
+   */
+  async delete(endpoint: string): Promise<void> {
+    try {
+      const token = await this.getAccessToken();
+
+      await axios({
+        method: 'DELETE',
+        url: `${this.config.organizationUrl}/${endpoint}`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0'
+        }
+      });
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error?.message || error.message || String(error);
+      console.error('PowerPlatform API DELETE request failed:', errorMessage);
+      throw new Error(`PowerPlatform API DELETE request failed: ${errorMessage}`);
     }
   }
 }

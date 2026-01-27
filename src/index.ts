@@ -1,8 +1,11 @@
 #!/usr/bin/env node
+import dotenv from "dotenv";
+dotenv.config();
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { PowerPlatformClient, PowerPlatformConfig } from "./PowerPlatformClient.js";
-import { EntityService, RecordService, OptionSetService, PluginService, DependencyService } from "./services/index.js";
+import { EntityService, RecordService, OptionSetService, PluginService, DependencyService, CustomizationService, FormService } from "./services/index.js";
 import { registerAllTools } from "./tools/index.js";
 import { registerAllPrompts } from "./prompts/index.js";
 import type { ServiceContext } from "./types.js";
@@ -29,6 +32,8 @@ let recordService: RecordService | null = null;
 let optionSetService: OptionSetService | null = null;
 let pluginService: PluginService | null = null;
 let dependencyService: DependencyService | null = null;
+let customizationService: CustomizationService | null = null;
+let formService: FormService | null = null;
 
 // Function to initialize the PowerPlatform client on demand
 function getClient(): PowerPlatformClient {
@@ -89,6 +94,20 @@ function getDependencyService(): DependencyService {
   return dependencyService;
 }
 
+function getCustomizationService(): CustomizationService {
+  if (!customizationService) {
+    customizationService = new CustomizationService(getClient());
+  }
+  return customizationService;
+}
+
+function getFormService(): FormService {
+  if (!formService) {
+    formService = new FormService(getClient());
+  }
+  return formService;
+}
+
 // Create service context for tools and prompts
 const ctx: ServiceContext = {
   getEntityService,
@@ -96,6 +115,8 @@ const ctx: ServiceContext = {
   getOptionSetService,
   getPluginService,
   getDependencyService,
+  getCustomizationService,
+  getFormService,
 };
 
 // Register all tools and prompts

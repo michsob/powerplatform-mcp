@@ -37,6 +37,7 @@ export function registerOptionSetTools(server: McpServer, ctx: ServiceContext): 
       } catch (error: any) {
         console.error("Error getting global option set:", error);
         return {
+          structuredContent: { optionSetName, optionSet: null },
           content: [
             {
               type: "text",
