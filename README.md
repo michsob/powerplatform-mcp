@@ -88,6 +88,10 @@ If not specified, the default Azure public cloud authority (`https://login.micro
    npm run inspector
    ```
 
+### MCP Inspector + Playwright MCP Server
+
+If you want to validate the Inspector flow end-to-end (including UI checks), see the Playwright-based walkthrough in [`docs/inspector-playwright.md`](docs/inspector-playwright.md).
+
 ## Development Workflow (TDD + Integration Tests)
 
 We use test-driven development (TDD) and rely heavily on integration-style Jest tests that exercise real services through `PowerPlatformClient`.
