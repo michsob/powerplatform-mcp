@@ -51,6 +51,23 @@ POWERPLATFORM_CLIENT_SECRET=your-azure-app-client-secret
 POWERPLATFORM_TENANT_ID=your-azure-tenant-id
 ```
 
+### National Cloud Support
+
+To authenticate to national clouds like GCC High, set the optional `POWERPLATFORM_AUTHORITY_URL` environment variable:
+
+```bash
+# For GCC High
+POWERPLATFORM_AUTHORITY_URL=https://login.microsoftonline.us
+
+# For Azure China
+POWERPLATFORM_AUTHORITY_URL=https://login.chinacloudapi.cn
+
+# For Azure Germany
+POWERPLATFORM_AUTHORITY_URL=https://login.microsoftonline.de
+```
+
+If not specified, the default Azure public cloud authority (`https://login.microsoftonline.com`) will be used.
+
 ### For Development
 
 1. Clone the repository and install dependencies:
@@ -68,9 +85,29 @@ POWERPLATFORM_TENANT_ID=your-azure-tenant-id
 3. Build and test:
    ```bash
    npm run build
-   npm run inspector:debug
+   npm run inspector
    ```
 
+### MCP Inspector + Playwright MCP Server
+
+If you want to validate the Inspector flow end-to-end (including UI checks), see the Playwright-based walkthrough in [`docs/inspector-playwright.md`](docs/inspector-playwright.md).
+
+## Development Workflow (TDD + Integration Tests)
+
+We use test-driven development (TDD) and rely heavily on integration-style Jest tests that exercise real services through `PowerPlatformClient`.
+
+1. Set up your environment variables in `.env` (see Configuration above).
+2. Write or update an integration test first in `tests/`.
+3. Run the tests:
+   - `npm test` (single run)
+   - `npm run test:watch` (TDD loop)
+   - `npm run test:coverage` (coverage report)
+4. Implement the minimal code needed in `src/` to make the test pass.
+5. Refactor safely with the test suite green.
+
+Notes:
+- Most tests in `tests/services/*.test.ts` are integration tests and will call the Dataverse Web API. Use a dedicated dev environment and avoid pointing at production.
+- When adding features, prefer extending service-level tests first (for example, `tests/services/EntityService.test.ts`) and then wire up tools/prompts.
 ## Usage
 
 This is an MCP server designed to work with MCP-compatible clients like Cursor, Claude App and GitHub Copilot. Once running, it will expose tools for retrieving PowerPlatform entity metadata and records.

@@ -3,6 +3,8 @@ import type { RecordService } from "./services/RecordService.js";
 import type { OptionSetService } from "./services/OptionSetService.js";
 import type { PluginService } from "./services/PluginService.js";
 import type { DependencyService } from "./services/DependencyService.js";
+import type { CustomizationService } from "./services/CustomizationService.js";
+import type { FormService } from "./services/FormService.js";
 
 /**
  * Service context providing lazy-initialized service getters.
@@ -14,4 +16,6 @@ export interface ServiceContext {
   getOptionSetService: () => OptionSetService;
   getPluginService: () => PluginService;
   getDependencyService: () => DependencyService;
+  getCustomizationService: () => CustomizationService;
+  getFormService: () => FormService;
 }

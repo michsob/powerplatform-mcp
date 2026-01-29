@@ -39,6 +39,7 @@ export function registerDependencyTools(server: McpServer, ctx: ServiceContext):
       } catch (error: any) {
         console.error("Error checking component dependencies:", error);
         return {
+          structuredContent: { componentId, componentType, dependencies: null },
           content: [
             {
               type: "text",
@@ -88,6 +89,7 @@ export function registerDependencyTools(server: McpServer, ctx: ServiceContext):
       } catch (error: any) {
         console.error("Error checking delete eligibility:", error);
         return {
+          structuredContent: { componentId, componentType, canDelete: false, dependencies: [] },
           content: [
             {
               type: "text",

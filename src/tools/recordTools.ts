@@ -39,6 +39,7 @@ export function registerRecordTools(server: McpServer, ctx: ServiceContext): voi
       } catch (error: any) {
         console.error("Error getting record:", error);
         return {
+          structuredContent: { entityNamePlural, recordId, record: null },
           content: [
             {
               type: "text",
@@ -86,6 +87,7 @@ export function registerRecordTools(server: McpServer, ctx: ServiceContext): voi
       } catch (error: any) {
         console.error("Error querying records:", error);
         return {
+          structuredContent: { entityNamePlural, filter, count: 0, records: null },
           content: [
             {
               type: "text",
