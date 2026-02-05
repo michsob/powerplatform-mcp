@@ -1,5 +1,5 @@
 {
-  "name": "powerplatform-mcp",
+  "name": "@kieran-ohara/powerplatform-mcp",
   "version": "1.0.1",
   "description": "PowerPlatform Model Context Protocol server",
   "main": "build/index.js",
@@ -28,11 +28,12 @@
   "license": "MIT",
   "type": "module",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://npm.pkg.github.com"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/michsob/powerplatform-mcp.git"
+    "url": "git+https://github.com/kieran-ohara/powerplatform-mcp.git"
   },
   "engines": {
     "node": ">=22.0.0 <25.0.0"
