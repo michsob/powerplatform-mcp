@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { PowerPlatformClient, PowerPlatformConfig } from "./PowerPlatformClient.js";
+import { PowerPlatformClient, PowerPlatformConfig } from "./powerplatform-client.js";
 import { EntityService, RecordService, OptionSetService, PluginService, DependencyService } from "./services/index.js";
 import { registerAllTools } from "./tools/index.js";
 import { registerAllPrompts } from "./prompts/index.js";
