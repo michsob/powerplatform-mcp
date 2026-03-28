@@ -1,8 +1,8 @@
-import type { EntityService } from "./services/EntityService.js";
-import type { RecordService } from "./services/RecordService.js";
-import type { OptionSetService } from "./services/OptionSetService.js";
-import type { PluginService } from "./services/PluginService.js";
-import type { DependencyService } from "./services/DependencyService.js";
+import type { EntityService } from "./services/entity-service.js";
+import type { RecordService } from "./services/record-service.js";
+import type { OptionSetService } from "./services/optionset-service.js";
+import type { PluginService } from "./services/plugin-service.js";
+import type { DependencyService } from "./services/dependency-service.js";
 
 /**
  * Service context providing lazy-initialized service getters.

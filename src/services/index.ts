@@ -1,6 +1,6 @@
-export { EntityService } from './EntityService.js';
-export { RecordService } from './RecordService.js';
-export { OptionSetService } from './OptionSetService.js';
-export { PluginService } from './PluginService.js';
-export { DependencyService } from './DependencyService.js';
+export { EntityService } from './entity-service.js';
+export { RecordService } from './record-service.js';
+export { OptionSetService } from './optionset-service.js';
+export { PluginService } from './plugin-service.js';
+export { DependencyService } from './dependency-service.js';
 export { ApiCollectionResponse } from '../models/index.js';

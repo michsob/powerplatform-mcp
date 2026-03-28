@@ -1,1 +1,1 @@
-export { ApiCollectionResponse } from './ApiCollectionResponse.js';
+export { ApiCollectionResponse } from './api-collection-response.js';
