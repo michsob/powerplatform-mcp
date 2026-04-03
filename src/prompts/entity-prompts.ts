@@ -1,12 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ServiceContext } from "../types.js";
+import type { EnvironmentRegistry } from "../environment-config.js";
 import { powerPlatformPrompts } from "./templates.js";
 
 /**
  * Register entity prompts with the MCP server.
  */
-export function registerEntityPrompts(server: McpServer, ctx: ServiceContext): void {
+export function registerEntityPrompts(server: McpServer, registry: EnvironmentRegistry): void {
   // Entity Overview Prompt
   server.registerPrompt(
     "entity-overview",
@@ -15,10 +15,12 @@ export function registerEntityPrompts(server: McpServer, ctx: ServiceContext): v
       description: "Get an overview of a Power Platform entity",
       argsSchema: {
         entityName: z.string().describe("The logical name of the entity"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
     },
     async (args) => {
       try {
+        const ctx = registry.getContext(args.environment);
         const service = ctx.getEntityService();
         const entityName = args.entityName;
 
@@ -96,10 +98,12 @@ export function registerEntityPrompts(server: McpServer, ctx: ServiceContext): v
       argsSchema: {
         entityName: z.string().describe("The logical name of the entity"),
         attributeName: z.string().describe("The logical name of the attribute"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
     },
     async (args) => {
       try {
+        const ctx = registry.getContext(args.environment);
         const service = ctx.getEntityService();
         const { entityName, attributeName } = args;
 
@@ -158,10 +162,12 @@ export function registerEntityPrompts(server: McpServer, ctx: ServiceContext): v
       description: "Get a template for querying a Power Platform entity",
       argsSchema: {
         entityName: z.string().describe("The logical name of the entity"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
     },
     async (args) => {
       try {
+        const ctx = registry.getContext(args.environment);
         const service = ctx.getEntityService();
         const entityName = args.entityName;
 
@@ -220,10 +226,12 @@ export function registerEntityPrompts(server: McpServer, ctx: ServiceContext): v
       description: "Get a list of relationships for a Power Platform entity",
       argsSchema: {
         entityName: z.string().describe("The logical name of the entity"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
     },
     async (args) => {
       try {
+        const ctx = registry.getContext(args.environment);
         const service = ctx.getEntityService();
         const entityName = args.entityName;
 
