@@ -1,11 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ServiceContext } from "../types.js";
+import type { EnvironmentRegistry } from "../environment-config.js";
 
 /**
  * Register entity metadata tools with the MCP server.
  */
-export function registerEntityTools(server: McpServer, ctx: ServiceContext): void {
+export function registerEntityTools(server: McpServer, registry: EnvironmentRegistry): void {
   // Get Entity Metadata
   server.registerTool(
     "get-entity-metadata",
@@ -14,14 +14,16 @@ export function registerEntityTools(server: McpServer, ctx: ServiceContext): voi
       description: "Get metadata about a PowerPlatform entity",
       inputSchema: {
         entityName: z.string().describe("The logical name of the entity"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         entityName: z.string(),
         metadata: z.any(),
       }),
     },
-    async ({ entityName }) => {
+    async ({ entityName, environment }) => {
       try {
+        const ctx = registry.getContext(environment);
         const service = ctx.getEntityService();
         const metadata = await service.getEntityMetadata(entityName);
 
@@ -56,14 +58,16 @@ export function registerEntityTools(server: McpServer, ctx: ServiceContext): voi
       description: "Get attributes/fields of a PowerPlatform entity",
       inputSchema: {
         entityName: z.string().describe("The logical name of the entity"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         entityName: z.string(),
         attributes: z.any(),
       }),
     },
-    async ({ entityName }) => {
+    async ({ entityName, environment }) => {
       try {
+        const ctx = registry.getContext(environment);
         const service = ctx.getEntityService();
         const attributes = await service.getEntityAttributes(entityName);
 
@@ -99,6 +103,7 @@ export function registerEntityTools(server: McpServer, ctx: ServiceContext): voi
       inputSchema: {
         entityName: z.string().describe("The logical name of the entity"),
         attributeName: z.string().describe("The logical name of the attribute"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         entityName: z.string(),
@@ -106,8 +111,9 @@ export function registerEntityTools(server: McpServer, ctx: ServiceContext): voi
         attribute: z.any(),
       }),
     },
-    async ({ entityName, attributeName }) => {
+    async ({ entityName, attributeName, environment }) => {
       try {
+        const ctx = registry.getContext(environment);
         const service = ctx.getEntityService();
         const attribute = await service.getEntityAttribute(entityName, attributeName);
 
@@ -142,14 +148,16 @@ export function registerEntityTools(server: McpServer, ctx: ServiceContext): voi
       description: "Get relationships (one-to-many and many-to-many) for a PowerPlatform entity",
       inputSchema: {
         entityName: z.string().describe("The logical name of the entity"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         entityName: z.string(),
         relationships: z.any(),
       }),
     },
-    async ({ entityName }) => {
+    async ({ entityName, environment }) => {
       try {
+        const ctx = registry.getContext(environment);
         const service = ctx.getEntityService();
         const relationships = await service.getEntityRelationships(entityName);
 

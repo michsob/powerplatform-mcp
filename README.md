@@ -1,356 +1,291 @@
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/michsob-powerplatform-mcp-badge.png)](https://mseep.ai/app/michsob-powerplatform-mcp)
+# PowerPlatform MCP / CLI
 
-# PowerPlatform MCP Server
+A Model Context Protocol (MCP) server **and** standalone CLI for querying PowerPlatform / Dataverse environments. Supports multiple environments, entity metadata, records, plugins, flows, solutions, workflows, business rules, security roles, and more.
 
-A Model Context Protocol (MCP) server that provides intelligent access to PowerPlatform/Dataverse entities and records. This tool offers context-aware assistance, entity exploration and metadata access.
+## Why MCP + CLI?
+
+**MCP** integrates directly with AI clients (Claude, Cursor, GitHub Copilot) for interactive, conversational exploration of your environments.
+
+**CLI** writes results to a **file system cache** instead of returning them inline. MCP tool responses are bound by the AI client's context window, which can truncate or degrade results when querying environments with hundreds of entities, flows, or plugin steps. The CLI avoids this limitation by persisting full results to disk, making them available for follow-up analysis without context pressure. Both interfaces share the same tools and capabilities.
+
+## Installation
+
+```bash
+# Install globally
+npm install -g powerplatform-mcp
+
+# Or run directly
+npx powerplatform-mcp
+```
+
+Requires **Node.js 22+** (< 25).
+
+## Configuration
+
+The tool supports **multiple environments**. Define them via environment variables:
+
+```bash
+POWERPLATFORM_ENVIRONMENTS=DEV,UAT,PROD
+
+# For each environment, set:
+POWERPLATFORM_DEV_URL=https://dev-org.crm.dynamics.com
+POWERPLATFORM_DEV_CLIENT_ID=your-client-id
+POWERPLATFORM_DEV_CLIENT_SECRET=your-client-secret
+POWERPLATFORM_DEV_TENANT_ID=your-tenant-id
+
+POWERPLATFORM_UAT_URL=https://uat-org.crm.dynamics.com
+POWERPLATFORM_UAT_CLIENT_ID=...
+POWERPLATFORM_UAT_CLIENT_SECRET=...
+POWERPLATFORM_UAT_TENANT_ID=...
+```
+
+For local development, copy `.env.example` to `.env` and fill in your credentials.
+
+## MCP Server
+
+The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilot). Start it with:
+
+```bash
+powerplatform-mcp          # if installed globally
+npx powerplatform-mcp      # without installing
+```
+
+### Docker
+
+```bash
+docker build -t powerplatform-mcp .
+docker run --env-file .env powerplatform-mcp
+```
+
+### Available MCP Tools (38)
+
+All tools accept an optional `environment` parameter to target a specific environment (defaults to the first configured).
+
+#### Entity
+
+| Tool | Description | Required Params |
+|------|-------------|-----------------|
+| `get-entity-metadata` | Get entity metadata | `entityName` |
+| `get-entity-attributes` | List all attributes/fields | `entityName` |
+| `get-entity-attribute` | Get a specific attribute | `entityName`, `attributeName` |
+| `get-entity-relationships` | Get 1:N and N:N relationships | `entityName` |
+
+#### Records
+
+| Tool | Description | Required Params | Optional |
+|------|-------------|-----------------|----------|
+| `get-record` | Get a record by ID | `entityNamePlural`, `recordId` | |
+| `query-records` | OData query | `entityNamePlural`, `filter` | `maxRecords` (default 50) |
+
+#### Plugins
+
+| Tool | Description | Required Params | Optional |
+|------|-------------|-----------------|----------|
+| `get-plugin-assemblies` | List plugin assemblies | | `includeManaged`, `maxRecords` |
+| `get-plugin-assembly-complete` | Assembly with types, steps, images | `assemblyName` | `includeDisabled` |
+| `get-entity-plugin-pipeline` | Plugins executing on an entity | `entityName` | `messageFilter`, `includeDisabled` |
+| `get-plugin-trace-logs` | Plugin trace logs | | `entityName`, `messageName`, `correlationId`, `pluginStepId`, `exceptionOnly`, `hoursBack`, `maxRecords` |
+| `get-all-plugin-steps` | All SDK message processing steps | | `includeDisabled`, `maxRecords` |
+
+#### Flows (Power Automate)
+
+| Tool | Description | Required Params | Optional |
+|------|-------------|-----------------|----------|
+| `get-flows` | List cloud flows (smart filtering) | | `activeOnly`, `maxRecords`, `nameContains`, `excludeSystem`, `excludeCustomerInsights`, `excludeCopilotSales` |
+| `search-workflows` | Search workflows and flows | | `name`, `primaryEntity`, `description`, `category`, `statecode`, `maxResults` |
+| `get-flow-definition` | Full definition or parsed summary | `flowId` | `summary` |
+| `get-flow-runs` | Flow run history | `flowId` | `status`, `startedAfter`, `startedBefore`, `maxRecords` |
+| `get-flow-run-details` | Run details with action-level errors | `flowId`, `runId` | |
+| `cancel-flow-run` | Cancel a running/waiting run | `flowId`, `runId` | |
+| `resubmit-flow-run` | Retry a failed run | `flowId`, `runId` | |
+| `scan-flow-health` | Batch health scan (success rates) | | `daysBack`, `maxRunsPerFlow`, `maxFlows`, `activeOnly` |
+| `get-flow-inventory` | Lightweight flow inventory | | `maxRecords` |
+
+#### Solutions
+
+| Tool | Description | Required Params | Optional |
+|------|-------------|-----------------|----------|
+| `get-publishers` | List non-readonly publishers | | |
+| `get-solutions` | List visible solutions | | |
+| `get-solution` | Get solution by unique name | `uniqueName` | |
+| `get-solution-components` | List components in a solution | `solutionUniqueName` | |
+| `export-solution` | Export solution (base64) | `solutionName` | `managed` |
+
+#### Workflows (Classic)
+
+| Tool | Description | Required Params | Optional |
+|------|-------------|-----------------|----------|
+| `get-workflows` | List classic workflows | | `activeOnly`, `maxRecords` |
+| `get-workflow-definition` | XAML definition or summary | `workflowId` | `summary` |
+| `get-ootb-workflows` | Background, BPFs, actions, on-demand | | `maxRecords`, `categories` |
+
+#### Business Rules
+
+| Tool | Description | Required Params | Optional |
+|------|-------------|-----------------|----------|
+| `get-business-rules` | List business rules | | `activeOnly`, `maxRecords` |
+| `get-business-rule` | Business rule with XAML | `workflowId` | |
+
+#### Option Sets
+
+| Tool | Description | Required Params |
+|------|-------------|-----------------|
+| `get-global-option-set` | Get a global option set definition | `optionSetName` |
+
+#### Configuration
+
+| Tool | Description | Optional |
+|------|-------------|----------|
+| `get-connection-references` | Connection references | `maxRecords`, `managedOnly`, `hasConnection`, `inactive` |
+| `get-environment-variables` | Environment variable definitions + values | `maxRecords`, `managedOnly` |
+
+#### Security Roles
+
+| Tool | Description | Required Params | Optional |
+|------|-------------|-----------------|----------|
+| `get-security-roles` | List customizable security roles | | `solutionUniqueName`, `excludeSystemRoles`, `includePrivileges`, `maxRecords` |
+| `get-security-role-privileges` | Privileges for a role | `roleId` | `entityFilter`, `accessRightFilter` |
+
+#### Dependencies
+
+| Tool | Description | Required Params |
+|------|-------------|-----------------|
+| `check-component-dependencies` | Dependencies blocking deletion | `componentId`, `componentType` |
+| `check-delete-eligibility` | Check if a component can be deleted | `componentId`, `componentType` |
+
+#### Service Endpoints
+
+| Tool | Description | Optional |
+|------|-------------|----------|
+| `get-service-endpoints` | Service Bus, webhooks, Event Hub, Event Grid | `maxRecords` |
+
+### MCP Prompts
+
+| Prompt | Description | Required Args |
+|--------|-------------|---------------|
+| `entity-overview` | Entity overview with key attributes and relationships | `entityName` |
+| `attribute-details` | Detailed attribute info (type, format, requirements) | `entityName`, `attributeName` |
+| `query-template` | OData query template with example filters | `entityName` |
+| `relationship-map` | Complete 1:N and N:N relationship map | `entityName` |
+
+---
+
+## CLI
+
+Same tools as the MCP server, but results are cached to the file system for full-fidelity output on large data sets.
+
+```bash
+# Run via node directly
+node build/cli.js <command> [options]
+```
+
+### Docker
+
+```bash
+docker build -f Dockerfile.cli -t powerplatform-cli .
+docker run --env-file .env powerplatform-cli entity-attributes account
+```
+
+### Global Option
+
+`--env <name>` — target environment (defaults to first configured).
+
+### Commands
+
+#### Entity
+```
+entity-metadata <entityName>
+entity-attributes <entityName>
+entity-attribute <entityName> <attributeName>
+entity-relationships <entityName>
+```
+
+#### Records
+```
+record <entityNamePlural> <recordId>
+query-records <entityNamePlural> <filter>  [--max <n>]
+```
+
+#### Plugins
+```
+plugin-assemblies                          [--include-managed] [--max <n>]
+plugin-assembly <assemblyName>
+entity-pipeline <entityName>               [--message <msg>] [--include-disabled]
+```
+
+#### Flows
+```
+flows                                      [--active] [--name <contains>] [--max <n>]
+flow-definition <flowId>                   [--summary]
+search-workflows                           (interactive filters)
+```
+
+#### Solutions
+```
+solutions
+solution <uniqueName>
+solution-components <uniqueName>
+```
+
+#### Workflows
+```
+workflows                                  [--active] [--max <n>]
+workflow-definition <workflowId>           [--summary]
+ootb-workflows                             [--categories <0,1,2,3,4>]
+```
+
+#### Business Rules
+```
+business-rules                             [--active] [--max <n>]
+business-rule <workflowId>
+```
+
+#### Option Sets
+```
+optionset <optionSetName>
+```
+
+#### Dependencies
+```
+check-dependencies <componentId> <componentType>
+```
+
+#### Configuration
+```
+connection-references                      [--managed-only] [--has-connection] [--no-connection] [--inactive] [--max-records <n>]
+environment-variables                      [--managed-only] [--max-records <n>]
+```
+
+#### Security Roles
+```
+security-roles                             [--solution <name>] [--include-system] [--include-privileges] [--max-records <n>]
+security-role-privileges <roleId>          [--entity <name>] [--access-right <type>]
+```
+
+#### Service Endpoints
+```
+service-endpoints                          [--max <n>]
+```
+
+---
+
+## Development
+
+```bash
+git clone https://github.com/michsob/powerplatform-mcp.git
+cd powerplatform-mcp
+npm install
+cp .env.example .env   # fill in credentials
+npm run build
+npm run inspector      # test with MCP Inspector
+```
+
+## License
+
+MIT
 
 <a href="https://glama.ai/mcp/servers/@michsob/powerplatform-mcp">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@michsob/powerplatform-mcp/badge" alt="PowerPlatform MCP server" />
 </a>
 
-Key features:
-- Rich entity metadata exploration with formatted, context-aware prompts
-- Advanced OData query support with intelligent filtering
-- Comprehensive relationship mapping and visualization
-- AI-assisted query building and data modeling through AI agent
-- Full access to entity attributes, relationships, and global option sets
-
-## Installation
-
-You can install and run this tool in two ways:
-
-### Option 1: Install globally
-
-```bash
-npm install -g powerplatform-mcp
-```
-
-Then run it:
-
-```bash
-powerplatform-mcp
-```
-
-### Option 2: Run directly with npx
-
-Run without installing:
-
-```bash
-npx powerplatform-mcp
-```
-
-## Configuration
-
-Before running, set the following environment variables:
-
-```bash
-# PowerPlatform/Dataverse connection details
-POWERPLATFORM_URL=https://yourenvironment.crm.dynamics.com
-POWERPLATFORM_CLIENT_ID=your-azure-app-client-id
-POWERPLATFORM_CLIENT_SECRET=your-azure-app-client-secret
-POWERPLATFORM_TENANT_ID=your-azure-tenant-id
-```
-
-### For Development
-
-1. Clone the repository and install dependencies:
-   ```bash
-   git clone https://github.com/michsob/powerplatform-mcp.git
-   cd powerplatform-mcp
-   npm install
-   ```
-
-2. Copy `.env.example` to `.env` and fill in your credentials:
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Build and test:
-   ```bash
-   npm run build
-   npm run inspector:debug
-   ```
-
-## Usage
-
-This is an MCP server designed to work with MCP-compatible clients like Cursor, Claude App and GitHub Copilot. Once running, it will expose tools for retrieving PowerPlatform entity metadata and records.
-
-### Available Tools
-
-- `get-entity-metadata`: Get metadata about a PowerPlatform entity
-- `get-entity-attributes`: Get attributes/fields of a PowerPlatform entity
-- `get-entity-attribute`: Get a specific attribute/field of a PowerPlatform entity
-- `get-entity-relationships`: Get relationships for a PowerPlatform entity
-- `get-global-option-set`: Get a global option set definition
-- `get-record`: Get a specific record by entity name and ID
-- `query-records`: Query records using an OData filter expression
-- `use-powerplatform-prompt`: Use pre-defined prompt templates for PowerPlatform entities
-
-## MCP Prompts
-
-The server includes a prompts feature that provides formatted, context-rich information about PowerPlatform entities.
-
-### Available Prompt Types
-
-The `use-powerplatform-prompt` tool supports the following prompt types:
-
-1. **ENTITY_OVERVIEW**: Comprehensive overview of an entity
-2. **ATTRIBUTE_DETAILS**: Detailed information about a specific entity attribute
-3. **QUERY_TEMPLATE**: OData query template for an entity with example filters
-4. **RELATIONSHIP_MAP**: Visual map of entity relationships
-
-### Examples
-
-#### Entity Overview Prompt
-
-```javascript
-// Example client code
-await mcpClient.invoke("use-powerplatform-prompt", {
-  promptType: "ENTITY_OVERVIEW",
-  entityName: "account"
-});
-```
-
-**Output:**
-```
-## Power Platform Entity: account
-
-This is an overview of the 'account' entity in Microsoft Power Platform/Dataverse:
-
-### Entity Details
-- Display Name: Account
-- Schema Name: Account
-- Description: Business that represents a customer or potential customer
-- Primary Key: accountid
-- Primary Name: name
-
-### Key Attributes
-- name: String (Account Name)
-- emailaddress1: String (Email)
-- telephone1: String (Main Phone)
-- address1_city: String (City)
-- statecode: Status (Status)
-- accountnumber: String (Account Number)
-- industrycode: OptionSetValue (Industry)
-- revenue: Money (Annual Revenue)
-- ownerid: Owner (Owner)
-- createdon: DateTime (Created On)
-
-### Relationships
-- One-to-Many Relationships: 42
-- Many-to-Many Relationships: 8
-
-You can query this entity using OData filters against the plural name.
-```
-
-#### Attribute Details Prompt
-
-```javascript
-await mcpClient.invoke("use-powerplatform-prompt", {
-  promptType: "ATTRIBUTE_DETAILS",
-  entityName: "account",
-  attributeName: "revenue"
-});
-```
-
-**Output:**
-```
-## Attribute: revenue
-
-Details for the 'revenue' attribute of the 'account' entity:
-
-- Display Name: Annual Revenue
-- Description: Annual revenue for the account
-- Type: Money
-- Format: Currency
-- Is Required: No
-- Is Searchable: true
-
-### Usage Notes
-- Data Type: Money
-- Required: No
-- Max Length: N/A
-```
-
-#### Query Template Prompt
-
-```javascript
-await mcpClient.invoke("use-powerplatform-prompt", {
-  promptType: "QUERY_TEMPLATE",
-  entityName: "account"
-});
-```
-
-**Output:**
-```
-## OData Query Template for accounts
-
-Use this template to build queries against the accounts entity:
-accounts?$select=name,emailaddress1,telephone1, address1_city,statecode&$filter=name eq 'Example'&$orderby=name asc&$top=50
-```
-
-### Common Filter Examples
-- Equals: `name eq 'Contoso'`
-- Contains: `contains(name, 'Contoso')`
-- Greater than date: `createdon gt 2023-01-01T00:00:00Z`
-- Multiple conditions: `name eq 'Contoso' and statecode eq 0`
-```
-
-#### Relationship Map Prompt
-
-```javascript
-await mcpClient.invoke("use-powerplatform-prompt", {
-  promptType: "RELATIONSHIP_MAP",
-  entityName: "contact"
-});
-```
-
-**Output:**
-```
-## Relationship Map for contact
-
-This shows all relationships for the 'contact' entity:
-
-### One-to-Many Relationships (contact as Primary)
-- contact_activity_parties: contact (1) → activityparty (N)
-- contact_connections1: contact (1) → connection (N)
-- contact_connections2: contact (1) → connection (N)
-- contact_customer_contacts: contact (1) → contact (N)
-- contact_master_contact: contact (1) → contact (N)
-
-### One-to-Many Relationships (contact as Related)
-- account_primary_contact: account (1) → contact (N)
-- customer_contacts: customer (1) → contact (N)
-- system_user_contacts: systemuser (1) → contact (N)
-
-### Many-to-Many Relationships
-- contactleads_association: contact (N) ↔ lead (N)
-- contactopportunities_association: contact (N) ↔ opportunity (N)
-- contactquotes_association: contact (N) ↔ quote (N)
-```
-
-## Prompt Examples
-
-Here are some examples of how you can interact with assistant using the PowerPlatform MCP prompts:
-
-### 1. Entity Understanding
-
-You can ask assistant about entities in natural language:
-
-```
-User: "Tell me about the Account entity in our PowerPlatform environment"
-
-Response:
-[uses ENTITY_OVERVIEW prompt internally]
-
-Here's what I found about the Account entity:
-- It's a core business entity representing customers and potential customers
-- The primary identifier is 'accountid' and the primary name field is 'name'
-- Key fields include:
-  * name (Account Name)
-  * emailaddress1 (Email)
-  * telephone1 (Main Phone)
-  * revenue (Annual Revenue)
-- It has 42 one-to-many relationships and 8 many-to-many relationships
-```
-
-### 2. Building Queries
-
-You can ask for help constructing queries:
-
-```
-User: "Help me write a query to find active accounts with revenue over $1M in California"
-
-Response:
-[uses QUERY_TEMPLATE prompt internally]
-
-Here's the OData query you need:
-accounts?$select=name,revenue,statecode,address1_stateorprovince
-&$filter=statecode eq 0 
-    and revenue gt 1000000 
-    and address1_stateorprovince eq 'California'
-&$orderby=revenue desc
-
-This query:
-1. Selects relevant fields
-2. Filters for active accounts (statecode eq 0)
-3. Checks revenue > $1M
-4. Filters for California location
-5. Orders by revenue highest to lowest
-```
-
-### 3. Understanding Relationships
-
-You can explore entity relationships naturally:
-
-```
-User: "How are Accounts and Contacts related in our system?"
-
-Response:
-[uses RELATIONSHIP_MAP prompt for both entities internally]
-
-Here are the key relationships between Accounts and Contacts:
-
-1. Primary Contact (One-to-Many):
-   - account_primary_contact: Account (1) → Contact (N)
-   - An account can have many contacts, but one designated as primary
-
-2. Customer Relationship:
-   - contact_customer_accounts: Contact (N) ← Account (1)
-   - Contacts can be associated with customer accounts
-
-3. Additional Relationships:
-   - accountleads_association: For lead tracking
-   - account_connections: For relationship management
-```
-
-### 4. Field/Attribute Investigation
-
-You can ask about specific fields:
-
-```
-User: "What kind of field is the revenue field on Account?"
-
-Response:
-[uses ATTRIBUTE_DETAILS prompt internally]
-
-The revenue field on Account is:
-- Data Type: Money
-- Format: Currency
-- Not required
-- Searchable: Yes
-- Used for: Tracking annual revenue for the account
-- Can be used in advanced find and filtered views
-```
-
-### 5. Complex Data Modeling
-
-You can get help with data modeling decisions:
-
-```
-User: "I need to design a solution for tracking product reviews. Which entities should I relate to?"
-
-Response:
-[uses multiple ENTITY_OVERVIEW and RELATIONSHIP_MAP prompts internally]
-
-Based on the existing data model, here's a suggested approach:
-
-1. Product (existing entity):
-   - Already has relationships with:
-     * Price lists
-     * Product categories
-     * Inventory units
-
-2. New Review entity should relate to:
-   - Product (N:1) - Each review is for one product
-   - Contact (N:1) - Reviews are written by contacts
-   - Account (N:1) - Optional link to company if B2B review
-
-
-
-
-These examples show how AI assistant can leverage the MCP prompts to provide context-aware, accurate assistance for PowerPlatform development tasks. The AI understands your environment's specific configuration and can help with both simple queries and complex architectural decisions.
-
-## License
-
-MIT
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/michsob-powerplatform-mcp-badge.png)](https://mseep.ai/app/michsob-powerplatform-mcp)

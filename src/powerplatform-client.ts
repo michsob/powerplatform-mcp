@@ -18,6 +18,8 @@ export class PowerPlatformClient {
   private msalClient: ConfidentialClientApplication;
   private accessToken: string | null = null;
   private tokenExpirationTime: number = 0;
+  private managementAccessToken: string | null = null;
+  private managementTokenExpirationTime: number = 0;
 
   constructor(config: PowerPlatformConfig) {
     this.config = config;
@@ -71,6 +73,39 @@ export class PowerPlatformClient {
     } catch (error) {
       console.error('Error acquiring access token:', error);
       throw new Error('Authentication failed');
+    }
+  }
+
+  /**
+   * Get an access token for the Flow Management API (api.flow.microsoft.com).
+   * Uses a different scope than the Dataverse token.
+   */
+  async getManagementToken(): Promise<string> {
+    const currentTime = Date.now();
+
+    if (this.managementAccessToken && this.managementTokenExpirationTime > currentTime) {
+      return this.managementAccessToken;
+    }
+
+    try {
+      const result = await this.msalClient.acquireTokenByClientCredential({
+        scopes: ['https://service.flow.microsoft.com/.default'],
+      });
+
+      if (!result || !result.accessToken) {
+        throw new Error('Failed to acquire management access token');
+      }
+
+      this.managementAccessToken = result.accessToken;
+
+      if (result.expiresOn) {
+        this.managementTokenExpirationTime = result.expiresOn.getTime() - (5 * 60 * 1000);
+      }
+
+      return this.managementAccessToken;
+    } catch (error) {
+      console.error('Error acquiring management access token:', error);
+      throw new Error('Management API authentication failed');
     }
   }
 

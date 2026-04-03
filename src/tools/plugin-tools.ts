@@ -1,11 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ServiceContext } from "../types.js";
+import type { EnvironmentRegistry } from "../environment-config.js";
 
 /**
  * Register plugin tools with the MCP server.
  */
-export function registerPluginTools(server: McpServer, ctx: ServiceContext): void {
+export function registerPluginTools(server: McpServer, registry: EnvironmentRegistry): void {
   // Get Plugin Assemblies
   server.registerTool(
     "get-plugin-assemblies",
@@ -15,14 +15,16 @@ export function registerPluginTools(server: McpServer, ctx: ServiceContext): voi
       inputSchema: {
         includeManaged: z.boolean().optional().describe("Include managed assemblies (default: false)"),
         maxRecords: z.number().optional().describe("Maximum number of records to retrieve (default: 100)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         totalCount: z.number(),
         assemblies: z.any(),
       }),
     },
-    async ({ includeManaged, maxRecords }) => {
+    async ({ includeManaged, maxRecords, environment }) => {
       try {
+        const ctx = registry.getContext(environment);
         const service = ctx.getPluginService();
         const result = await service.getPluginAssemblies(includeManaged ?? false, maxRecords ?? 100);
 
@@ -58,6 +60,7 @@ export function registerPluginTools(server: McpServer, ctx: ServiceContext): voi
       inputSchema: {
         assemblyName: z.string().describe("The name of the plugin assembly"),
         includeDisabled: z.boolean().optional().describe("Include disabled steps (default: false)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         assembly: z.any(),
@@ -66,8 +69,9 @@ export function registerPluginTools(server: McpServer, ctx: ServiceContext): voi
         validation: z.any(),
       }),
     },
-    async ({ assemblyName, includeDisabled }) => {
+    async ({ assemblyName, includeDisabled, environment }) => {
       try {
+        const ctx = registry.getContext(environment);
         const service = ctx.getPluginService();
         const result = await service.getPluginAssemblyComplete(assemblyName, includeDisabled ?? false);
 
@@ -108,6 +112,7 @@ export function registerPluginTools(server: McpServer, ctx: ServiceContext): voi
         entityName: z.string().describe("The logical name of the entity"),
         messageFilter: z.string().optional().describe("Filter by specific message (e.g., 'Create', 'Update', 'Delete')"),
         includeDisabled: z.boolean().optional().describe("Include disabled steps (default: false)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         entity: z.string(),
@@ -116,8 +121,9 @@ export function registerPluginTools(server: McpServer, ctx: ServiceContext): voi
         executionOrder: z.any(),
       }),
     },
-    async ({ entityName, messageFilter, includeDisabled }) => {
+    async ({ entityName, messageFilter, includeDisabled, environment }) => {
       try {
+        const ctx = registry.getContext(environment);
         const service = ctx.getPluginService();
         const result = await service.getEntityPluginPipeline(entityName, messageFilter, includeDisabled ?? false);
 
@@ -162,14 +168,16 @@ export function registerPluginTools(server: McpServer, ctx: ServiceContext): voi
         exceptionOnly: z.boolean().optional().describe("Only show logs with exceptions (default: false)"),
         hoursBack: z.number().optional().describe("Hours to look back (default: 24)"),
         maxRecords: z.number().optional().describe("Maximum number of records (default: 50)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         totalCount: z.number(),
         logs: z.any(),
       }),
     },
-    async ({ entityName, messageName, correlationId, pluginStepId, exceptionOnly, hoursBack, maxRecords }) => {
+    async ({ entityName, messageName, correlationId, pluginStepId, exceptionOnly, hoursBack, maxRecords, environment }) => {
       try {
+        const ctx = registry.getContext(environment);
         const service = ctx.getPluginService();
         const result = await service.getPluginTraceLogs({
           entityName,
@@ -202,6 +210,52 @@ export function registerPluginTools(server: McpServer, ctx: ServiceContext): voi
             {
               type: "text",
               text: `Failed to get plugin trace logs: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  // Get All Plugin Steps
+  server.registerTool(
+    "get-all-plugin-steps",
+    {
+      title: "Get All Plugin Steps",
+      description: "Get all plugin SDK message processing steps across all assemblies in the environment",
+      inputSchema: {
+        includeDisabled: z.boolean().optional().describe("Include disabled steps (default: true)"),
+        maxRecords: z.number().optional().describe("Maximum records (default: 500)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+    },
+    async ({ includeDisabled, maxRecords, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        const result = await service.getAllPluginSteps({
+          includeDisabled: includeDisabled ?? true,
+          maxRecords: maxRecords ?? 500,
+        });
+
+        const enabledCount = result.steps.filter((s) => s.enabled).length;
+
+        return {
+          structuredContent: result,
+          content: [
+            {
+              type: "text",
+              text: `Found ${result.totalCount} plugin steps (${enabledCount} enabled):\n\n${JSON.stringify(result.steps, null, 2)}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error getting all plugin steps:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to get plugin steps: ${error.message}`,
             },
           ],
         };
