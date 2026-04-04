@@ -10,15 +10,35 @@ A Model Context Protocol (MCP) server **and** standalone CLI for querying PowerP
 
 ## Installation
 
-```bash
-# Install globally
-npm install -g powerplatform-mcp
+Requires **Node.js 22+** (< 25).
 
-# Or run directly
+### MCP Server
+
+```bash
+npm install -g powerplatform-mcp
+# or
 npx powerplatform-mcp
 ```
 
-Requires **Node.js 22+** (< 25).
+### CLI
+
+```bash
+npm install -g powerplatform-cli
+# or
+npx powerplatform-cli
+```
+
+### Docker
+
+```bash
+# MCP Server
+docker pull ghcr.io/michsob/powerplatform-mcp
+docker run --env-file .env ghcr.io/michsob/powerplatform-mcp
+
+# CLI
+docker pull ghcr.io/michsob/powerplatform-cli
+docker run --env-file .env ghcr.io/michsob/powerplatform-cli entity-attributes account
+```
 
 ## Configuration
 
@@ -43,19 +63,7 @@ For local development, copy `.env.example` to `.env` and fill in your credential
 
 ## MCP Server
 
-The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilot). Start it with:
-
-```bash
-powerplatform-mcp          # if installed globally
-npx powerplatform-mcp      # without installing
-```
-
-### Docker
-
-```bash
-docker build -t powerplatform-mcp .
-docker run --env-file .env powerplatform-mcp
-```
+The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilot).
 
 ### Available MCP Tools (38)
 
@@ -173,18 +181,6 @@ All tools accept an optional `environment` parameter to target a specific enviro
 ## CLI
 
 Same tools as the MCP server, but results are cached to the file system for full-fidelity output on large data sets.
-
-```bash
-# Run via node directly
-node build/cli.js <command> [options]
-```
-
-### Docker
-
-```bash
-docker build -f Dockerfile.cli -t powerplatform-cli .
-docker run --env-file .env powerplatform-cli entity-attributes account
-```
 
 ### Global Option
 

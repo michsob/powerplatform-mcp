@@ -82,18 +82,21 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Sync version from package.json to package.cli.json
+      - name: Stage CLI package
         run: |
+          mkdir -p dist-cli
+          cp -r build README.md LICENSE dist-cli/ 2>/dev/null || true
           VERSION=$(node -p "require('./package.json').version")
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.cli.json', 'utf8'));
             pkg.version = '$VERSION';
-            fs.writeFileSync('package.cli.json', JSON.stringify(pkg, null, 2) + '\n');
+            fs.writeFileSync('dist-cli/package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
       - name: Publish powerplatform-cli to npm
-        run: cp package.cli.json package.json && npm publish --provenance --access public
+        run: npm publish --provenance --access public
+        working-directory: dist-cli
 
   publish-gpr-mcp:
     needs: verify
@@ -142,18 +145,21 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Sync version from package.json to package.cli.json
+      - name: Stage CLI package
         run: |
+          mkdir -p dist-cli
+          cp -r build README.md LICENSE dist-cli/ 2>/dev/null || true
           VERSION=$(node -p "require('./package.json').version")
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.cli.json', 'utf8'));
             pkg.version = '$VERSION';
-            fs.writeFileSync('package.cli.json', JSON.stringify(pkg, null, 2) + '\n');
+            fs.writeFileSync('dist-cli/package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
       - name: Publish powerplatform-cli to GitHub Packages
-        run: cp package.cli.json package.json && npm publish
+        run: npm publish
+        working-directory: dist-cli
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
