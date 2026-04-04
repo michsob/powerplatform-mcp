@@ -52,10 +52,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          registry-url: https://registry.npmjs.org
 
-      - name: Remove auth token for OIDC
-        run: npm config delete //registry.npmjs.org/:_authToken
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
@@ -79,10 +78,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          registry-url: https://registry.npmjs.org
 
-      - name: Remove auth token for OIDC
-        run: npm config delete //registry.npmjs.org/:_authToken
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
