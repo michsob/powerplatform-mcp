@@ -1,0 +1,39 @@
+{
+  "name": "powerplatform-cli",
+  "version": "2.0.0",
+  "description": "PowerPlatform CLI — query Dataverse metadata with cached file output",
+  "main": "build/cli.js",
+  "bin": {
+    "powerplatform-cli": "build/cli.js"
+  },
+  "files": [
+    "build",
+    "README.md"
+  ],
+  "keywords": [
+    "powerplatform",
+    "cli",
+    "dynamics",
+    "dataverse"
+  ],
+  "author": "Michal Sobieraj",
+  "license": "MIT",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/michsob/powerplatform-mcp.git"
+  },
+  "engines": {
+    "node": ">=22.0.0 <25.0.0"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^5.0.2",
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "axios": "^1.13.2",
+    "commander": "^14.0.3",
+    "zod": "^4.3.5"
+  }
+}

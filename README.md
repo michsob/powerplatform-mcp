@@ -280,6 +280,27 @@ npm run build
 npm run inspector      # test with MCP Inspector
 ```
 
+## Releasing
+
+To publish a new version:
+
+1. Update `version` in `package.json`
+2. Commit the change to `main`
+3. Create and push a version tag:
+   ```bash
+   git tag v1.0.2
+   git push origin v1.0.2
+   ```
+
+GitHub Actions will automatically publish:
+
+| Package | npm | GitHub Packages | Docker (GHCR) |
+|---------|-----|-----------------|---------------|
+| MCP Server | `npm i powerplatform-mcp` | `npm i @michsob/powerplatform-mcp` | `ghcr.io/michsob/powerplatform-mcp` |
+| CLI | `npm i powerplatform-cli` | `npm i @michsob/powerplatform-cli` | `ghcr.io/michsob/powerplatform-cli` |
+
+**Setup:** An `NPM_TOKEN` repository secret (npm automation token) must be configured in the repository's GitHub Actions secrets. GitHub Packages and GHCR use the built-in `GITHUB_TOKEN` automatically.
+
 ## License
 
 MIT
