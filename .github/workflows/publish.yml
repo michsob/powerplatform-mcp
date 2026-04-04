@@ -119,6 +119,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Scope package for GitHub Packages
+        run: npm pkg set name="@michsob/powerplatform-mcp"
+
       - name: Publish powerplatform-mcp to GitHub Packages
         run: npm publish --registry=https://npm.pkg.github.com
         env:
@@ -154,6 +157,7 @@ jobs:
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.cli.json', 'utf8'));
             pkg.version = '$VERSION';
+            pkg.name = '@michsob/powerplatform-cli';
             fs.writeFileSync('dist-cli/package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
