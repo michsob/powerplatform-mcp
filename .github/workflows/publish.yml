@@ -120,7 +120,7 @@ jobs:
         run: npm run build
 
       - name: Publish powerplatform-mcp to GitHub Packages
-        run: npm publish
+        run: npm publish --registry=https://npm.pkg.github.com
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -158,7 +158,7 @@ jobs:
           "
 
       - name: Publish powerplatform-cli to GitHub Packages
-        run: npm publish
+        run: npm publish --registry=https://npm.pkg.github.com
         working-directory: dist-cli
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
