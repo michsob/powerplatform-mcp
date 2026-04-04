@@ -85,6 +85,7 @@ web_modules/
 
 #Build output
 build
+dist-cli
 
 # Next.js build output
 .next
