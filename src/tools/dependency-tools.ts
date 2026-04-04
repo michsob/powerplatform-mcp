@@ -1,11 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ServiceContext } from "../types.js";
+import type { EnvironmentRegistry } from "../environment-config.js";
 
 /**
  * Register dependency checking tools with the MCP server.
  */
-export function registerDependencyTools(server: McpServer, ctx: ServiceContext): void {
+export function registerDependencyTools(server: McpServer, registry: EnvironmentRegistry): void {
   // Check Component Dependencies
   server.registerTool(
     "check-component-dependencies",
@@ -15,6 +15,7 @@ export function registerDependencyTools(server: McpServer, ctx: ServiceContext):
       inputSchema: {
         componentId: z.string().describe("The GUID of the component to check"),
         componentType: z.number().describe("The component type number (e.g., 1=Entity, 9=OptionSet, 29=Workflow, 80=PluginAssembly, 90=PluginType, 92=SdkMessageProcessingStep)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         componentId: z.string(),
@@ -22,8 +23,9 @@ export function registerDependencyTools(server: McpServer, ctx: ServiceContext):
         dependencies: z.any(),
       }),
     },
-    async ({ componentId, componentType }) => {
+    async ({ componentId, componentType, environment }) => {
       try {
+        const ctx = registry.getContext(environment);
         const service = ctx.getDependencyService();
         const dependencies = await service.checkDependencies(componentId, componentType);
 
@@ -59,6 +61,7 @@ export function registerDependencyTools(server: McpServer, ctx: ServiceContext):
       inputSchema: {
         componentId: z.string().describe("The GUID of the component to check"),
         componentType: z.number().describe("The component type number (e.g., 1=Entity, 9=OptionSet, 29=Workflow, 80=PluginAssembly, 90=PluginType, 92=SdkMessageProcessingStep)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         componentId: z.string(),
@@ -67,8 +70,9 @@ export function registerDependencyTools(server: McpServer, ctx: ServiceContext):
         dependencies: z.array(z.any()),
       }),
     },
-    async ({ componentId, componentType }) => {
+    async ({ componentId, componentType, environment }) => {
       try {
+        const ctx = registry.getContext(environment);
         const service = ctx.getDependencyService();
         const result = await service.checkDeleteEligibility(componentId, componentType);
 
