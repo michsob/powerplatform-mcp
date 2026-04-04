@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 jobs:
   verify:
@@ -60,9 +61,7 @@ jobs:
         run: npm run build
 
       - name: Publish powerplatform-mcp to npm
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
 
   publish-npm-cli:
     needs: verify
@@ -96,9 +95,7 @@ jobs:
           "
 
       - name: Publish powerplatform-cli to npm
-        run: cp package.cli.json package.json && npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: cp package.cli.json package.json && npm publish --provenance --access public
 
   publish-gpr-mcp:
     needs: verify

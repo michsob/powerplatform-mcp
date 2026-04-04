@@ -299,7 +299,7 @@ GitHub Actions will automatically publish:
 | MCP Server | `npm i powerplatform-mcp` | `npm i @michsob/powerplatform-mcp` | `ghcr.io/michsob/powerplatform-mcp` |
 | CLI | `npm i powerplatform-cli` | `npm i @michsob/powerplatform-cli` | `ghcr.io/michsob/powerplatform-cli` |
 
-**Setup:** An `NPM_TOKEN` repository secret (npm automation token) must be configured in the repository's GitHub Actions secrets. GitHub Packages and GHCR use the built-in `GITHUB_TOKEN` automatically.
+npm publishing uses [Trusted Publishing (OIDC)](https://docs.npmjs.com/trusted-publishers/) — no tokens or secrets needed. GitHub Packages and GHCR use the built-in `GITHUB_TOKEN` automatically.
 
 ## License
 
