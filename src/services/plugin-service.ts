@@ -7,6 +7,30 @@
 import { PowerPlatformClient } from '../powerplatform-client.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
+export interface PluginStepInventoryEntry {
+  stepId: string;
+  name: string;
+  messageName: string;
+  stage: number;
+  stageName: string;
+  mode: number;
+  modeName: string;
+  statuscode: number;
+  enabled: boolean;
+  rank: number;
+  filteringAttributes: string | null;
+  pluginTypeName: string | null;
+  assemblyName: string | null;
+  isManaged: boolean;
+  modifiedOn: string;
+}
+
+export interface PluginStepInventoryResult {
+  [key: string]: unknown;
+  totalCount: number;
+  steps: PluginStepInventoryEntry[];
+}
+
 export class PluginService {
   constructor(private client: PowerPlatformClient) {}
 
@@ -386,6 +410,53 @@ export class PluginService {
     return {
       totalCount: parsedLogs.length,
       logs: parsedLogs,
+    };
+  }
+
+  /**
+   * Get all plugin SDK message processing steps across all assemblies.
+   * Useful for cross-environment comparison of plugin registrations.
+   */
+  async getAllPluginSteps(options?: {
+    includeDisabled?: boolean;
+    maxRecords?: number;
+  }): Promise<PluginStepInventoryResult> {
+    const { includeDisabled = true, maxRecords = 500 } = options ?? {};
+    const statusFilter = includeDisabled ? '' : 'statuscode eq 1 and ';
+
+    const response = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
+      `api/data/v9.2/sdkmessageprocessingsteps?$filter=${statusFilter}ishidden/Value eq false&$select=sdkmessageprocessingstepid,name,stage,mode,rank,statuscode,filteringattributes,ismanaged,modifiedon&$expand=sdkmessageid($select=name),plugintypeid($select=typename,assemblyname)&$orderby=name&$top=${maxRecords}`,
+    );
+
+    const steps: PluginStepInventoryEntry[] = response.value.map((step) => {
+      const sdkmsg = step.sdkmessageid as { name?: string } | null;
+      const pluginType = step.plugintypeid as { typename?: string; assemblyname?: string } | null;
+
+      return {
+        stepId: step.sdkmessageprocessingstepid as string,
+        name: step.name as string,
+        messageName: sdkmsg?.name ?? 'Unknown',
+        stage: step.stage as number,
+        stageName:
+          step.stage === 10 ? 'PreValidation'
+            : step.stage === 20 ? 'PreOperation'
+              : 'PostOperation',
+        mode: step.mode as number,
+        modeName: step.mode === 0 ? 'Synchronous' : 'Asynchronous',
+        statuscode: step.statuscode as number,
+        enabled: step.statuscode === 1,
+        rank: step.rank as number,
+        filteringAttributes: (step.filteringattributes as string) ?? null,
+        pluginTypeName: pluginType?.typename ?? null,
+        assemblyName: pluginType?.assemblyname ?? null,
+        isManaged: step.ismanaged as boolean,
+        modifiedOn: step.modifiedon as string,
+      };
+    });
+
+    return {
+      totalCount: steps.length,
+      steps,
     };
   }
 
