@@ -1,6 +1,6 @@
 # PowerPlatform MCP / CLI
 
-A Model Context Protocol (MCP) server **and** standalone CLI for querying PowerPlatform / Dataverse environments. Supports multiple environments, entity metadata, records, plugins, flows, solutions, workflows, business rules, security roles, and more.
+A Model Context Protocol (MCP) server **and** standalone CLI for querying **and configuring** PowerPlatform / Dataverse environments. Supports multiple environments, entity metadata, records, plugins, flows, solutions, workflows, business rules, security roles, custom APIs, web resources, and more — including write operations for automated environment setup.
 
 ## Why MCP + CLI?
 
@@ -65,18 +65,21 @@ For local development, copy `.env.example` to `.env` and fill in your credential
 
 The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilot).
 
-### Available MCP Tools (38)
+### Available MCP Tools (67)
 
 All tools accept an optional `environment` parameter to target a specific environment (defaults to the first configured).
 
 #### Entity
 
-| Tool | Description | Required Params |
-|------|-------------|-----------------|
-| `get-entity-metadata` | Get entity metadata | `entityName` |
-| `get-entity-attributes` | List all attributes/fields | `entityName` |
-| `get-entity-attribute` | Get a specific attribute | `entityName`, `attributeName` |
-| `get-entity-relationships` | Get 1:N and N:N relationships | `entityName` |
+| Tool | Description | Required Params | Optional |
+|------|-------------|-----------------|----------|
+| `get-entity-metadata` | Get entity metadata | `entityName` | |
+| `get-entity-attributes` | List all attributes/fields | `entityName` | |
+| `get-entity-attribute` | Get a specific attribute | `entityName`, `attributeName` | |
+| `get-entity-relationships` | Get 1:N and N:N relationships | `entityName` | |
+| `create-entity-string-attribute` | Create a Single Line of Text column | `entityName`, `schemaName`, `displayName` | `maxLength`, `requiredLevel`, `description`, `solutionName` |
+| `get-entity-keys` | List alternate keys on an entity | `entityName` | |
+| `create-entity-alternate-key` | Create an alternate key | `entityName`, `schemaName`, `displayName`, `keyAttributes` | `solutionName` |
 
 #### Records
 
@@ -94,6 +97,9 @@ All tools accept an optional `environment` parameter to target a specific enviro
 | `get-entity-plugin-pipeline` | Plugins executing on an entity | `entityName` | `messageFilter`, `includeDisabled` |
 | `get-plugin-trace-logs` | Plugin trace logs | | `entityName`, `messageName`, `correlationId`, `pluginStepId`, `exceptionOnly`, `hoursBack`, `maxRecords` |
 | `get-all-plugin-steps` | All SDK message processing steps | | `includeDisabled`, `maxRecords` |
+| `get-plugin-type` | Look up a plugin type by class name | `typeName` | |
+| `get-sdk-message` | Look up an SDK message by name | `messageName` | |
+| `create-plugin-step` | Register a plugin step | `name`, `pluginTypeId`, `sdkMessageId`, `stage`, `mode` | `rank`, `supportedDeployment`, `description`, `configuration`, `sdkMessageFilterId`, `solutionName` |
 
 #### Flows (Power Automate)
 
@@ -118,6 +124,8 @@ All tools accept an optional `environment` parameter to target a specific enviro
 | `get-solution` | Get solution by unique name | `uniqueName` | |
 | `get-solution-components` | List components in a solution | `solutionUniqueName` | |
 | `export-solution` | Export solution (base64) | `solutionName` | `managed` |
+| `add-solution-component` | Add a component to a solution | `solutionUniqueName`, `componentId`, `componentType` | `addRequiredComponents` |
+| `publish-customizations` | Publish entity or all customizations | | `entityLogicalName` |
 
 #### Workflows (Classic)
 
@@ -142,10 +150,32 @@ All tools accept an optional `environment` parameter to target a specific enviro
 
 #### Configuration
 
-| Tool | Description | Optional |
-|------|-------------|----------|
-| `get-connection-references` | Connection references | `maxRecords`, `managedOnly`, `hasConnection`, `inactive` |
-| `get-environment-variables` | Environment variable definitions + values | `maxRecords`, `managedOnly` |
+| Tool | Description | Required Params | Optional |
+|------|-------------|-----------------|----------|
+| `get-connection-references` | Connection references | | `maxRecords`, `managedOnly`, `hasConnection`, `inactive` |
+| `get-environment-variables` | Environment variable definitions + values | | `maxRecords`, `managedOnly` |
+| `create-environment-variable` | Create an environment variable definition | `schemaName`, `displayName`, `type` | `defaultValue`, `description`, `solutionName` |
+| `set-environment-variable-value` | Set or update an environment variable value | `definitionId`, `value` | `existingValueId` |
+
+#### Custom APIs
+
+| Tool | Description | Required Params | Optional |
+|------|-------------|-----------------|----------|
+| `get-custom-apis` | List Custom API definitions | | `maxRecords`, `includeManaged` |
+| `get-custom-api` | Get a Custom API by unique name | `uniqueName` | |
+| `create-custom-api` | Create a Custom API definition | `uniqueName`, `name`, `displayName`, `bindingType`, `isFunction`, `isPrivate`, `allowedCustomProcessingStepType` | `description`, `pluginTypeId`, `pluginTypeName`, `boundEntityLogicalName`, `solutionName` |
+| `get-custom-api-response-properties` | List response properties | `customApiId` | |
+| `create-custom-api-response-property` | Create a response property | `customApiId`, `uniqueName`, `name`, `displayName`, `type` | `description`, `logicalEntityName`, `solutionName` |
+| `get-custom-api-request-parameters` | List request parameters | `customApiId` | |
+| `create-custom-api-request-parameter` | Create a request parameter | `customApiId`, `uniqueName`, `name`, `displayName`, `type` | `description`, `logicalEntityName`, `isOptional`, `solutionName` |
+
+#### Web Resources
+
+| Tool | Description | Required Params | Optional |
+|------|-------------|-----------------|----------|
+| `get-web-resources` | List web resources | | `maxRecords`, `webResourceType`, `nameFilter` |
+| `get-web-resource` | Get a web resource by name | `name` | |
+| `create-web-resource` | Upload a new web resource | `name`, `displayName`, `webResourceType`, `content` | `description`, `solutionName` |
 
 #### Security Roles
 
@@ -194,6 +224,9 @@ entity-metadata <entityName>
 entity-attributes <entityName>
 entity-attribute <entityName> <attributeName>
 entity-relationships <entityName>
+create-entity-string-attribute <entityName> <schemaName> <displayName>  [--max-length <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
+entity-keys <entityName>
+create-entity-alternate-key <entityName> <schemaName> <displayName> <keyAttributes...>  [--solution <name>]
 ```
 
 #### Records
@@ -205,8 +238,16 @@ query-records <entityNamePlural> <filter>  [--max <n>]
 #### Plugins
 ```
 plugin-assemblies                          [--include-managed] [--max <n>]
-plugin-assembly <assemblyName>
+plugin-assembly <assemblyName>             [--include-disabled]
+plugin-packages                            [--include-managed] [--max <n>]
+plugin-type <typeName>
 entity-pipeline <entityName>               [--message <msg>] [--include-disabled]
+plugin-trace-logs                          [--entity <name>] [--message <msg>] [--hours <n>] [--max <n>] [--exceptions-only]
+all-plugin-steps                           [--include-disabled] [--max <n>]
+sdk-message <messageName>
+register-plugin-package <filePath>         --name <name> --unique-name <uniqueName> [--pkg-version <version>] [--solution <name>]
+update-plugin-package <filePath>           --plugin-package-id <id> [--pkg-version <version>]
+create-plugin-step <name> <pluginTypeId> <sdkMessageId>  [--stage <n>] [--mode <n>] [--rank <n>] [--solution <name>]
 ```
 
 #### Flows
@@ -221,6 +262,8 @@ search-workflows                           (interactive filters)
 solutions
 solution <uniqueName>
 solution-components <uniqueName>
+add-solution-component <solutionUniqueName> <componentId> <componentType>  [--add-required]
+publish-customizations                     [--entity <logicalName>]
 ```
 
 #### Workflows
@@ -250,6 +293,33 @@ check-dependencies <componentId> <componentType>
 ```
 connection-references                      [--managed-only] [--has-connection] [--no-connection] [--inactive] [--max-records <n>]
 environment-variables                      [--managed-only] [--max-records <n>]
+create-environment-variable <schemaName> <displayName>  [--type <type>] [--default-value <val>] [--description <desc>] [--solution <name>]
+set-environment-variable-value <definitionId> <value>   [--existing-value-id <id>]
+```
+
+#### Custom APIs
+```
+custom-apis                                [--include-managed] [--max <n>]
+custom-api <uniqueName>
+create-custom-api <uniqueName> <displayName>  [--binding-type <n>] [--processing-type <n>] [--plugin-type-id <id>] [--plugin-type-name <name>] [--description <desc>] [--solution <name>]
+custom-api-response-properties <customApiId>
+create-custom-api-response-property <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--solution <name>]
+custom-api-request-parameters <customApiId>
+create-custom-api-request-parameter <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--optional] [--solution <name>]
+```
+
+#### Web Resources
+```
+web-resources                              [--type <n>] [--name <contains>] [--max <n>]
+web-resource <name>
+create-web-resource <name> <displayName> <filePath>  [--type <n>] [--description <desc>] [--solution <name>]
+```
+
+#### PAC Integration
+```
+pac-auth                                   Authenticate pac CLI using environment credentials
+generate-models <outdirectory>             [--settings <path>] [--entities <filter>] [--namespace <ns>]
+deploy-plugin <pluginFile>                 --plugin-id <id> [--type <Nuget|Assembly>] [--configuration <config>]
 ```
 
 #### Security Roles

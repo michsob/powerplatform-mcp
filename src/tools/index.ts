@@ -12,6 +12,8 @@ import { registerWorkflowTools } from "./workflow-tools.js";
 import { registerConfigurationTools } from "./configuration-tools.js";
 import { registerSecurityRoleTools } from "./security-role-tools.js";
 import { registerServiceEndpointTools } from "./service-endpoint-tools.js";
+import { registerCustomApiTools } from "./customapi-tools.js";
+import { registerWebResourceTools } from "./webresource-tools.js";
 
 export { registerEntityTools } from "./entity-tools.js";
 export { registerRecordTools } from "./record-tools.js";
@@ -25,6 +27,8 @@ export { registerWorkflowTools } from "./workflow-tools.js";
 export { registerConfigurationTools } from "./configuration-tools.js";
 export { registerSecurityRoleTools } from "./security-role-tools.js";
 export { registerServiceEndpointTools } from "./service-endpoint-tools.js";
+export { registerCustomApiTools } from "./customapi-tools.js";
+export { registerWebResourceTools } from "./webresource-tools.js";
 
 /**
  * Register all tools with the MCP server.
@@ -42,4 +46,6 @@ export function registerAllTools(server: McpServer, registry: EnvironmentRegistr
   registerConfigurationTools(server, registry);
   registerSecurityRoleTools(server, registry);
   registerServiceEndpointTools(server, registry);
+  registerCustomApiTools(server, registry);
+  registerWebResourceTools(server, registry);
 }

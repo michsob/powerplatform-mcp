@@ -145,3 +145,4 @@ dist
 .playwright-mcp
 .claude
 Claude.md
+.pp-cache/

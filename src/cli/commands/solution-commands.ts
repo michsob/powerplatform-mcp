@@ -93,6 +93,44 @@ export function registerSolutionCommands(program: Command, registry: Environment
     });
 
   program
+    .command('add-solution-component <solutionUniqueName> <componentId> <componentType>')
+    .description('Add a component to a Dataverse solution')
+    .option('--add-required', 'Also add required dependencies')
+    .action(async (solutionUniqueName: string, componentId: string, componentType: string, opts: {
+      addRequired?: boolean;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getSolutionService();
+      const result = await service.addSolutionComponent(
+        solutionUniqueName, componentId, parseInt(componentType, 10), opts.addRequired ?? false,
+      );
+
+      outputResult({
+        fileName: `add-component-${solutionUniqueName}-${componentId}`,
+        data: result,
+        summary: [
+          `Added component to solution '${solutionUniqueName}':`,
+          `  Component ID: ${componentId}`,
+          `  Component Type: ${componentType}`,
+          `  Add Required: ${opts.addRequired ?? false}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('publish-customizations')
+    .description('Publish entity or all customizations in Dataverse')
+    .option('--entity <logicalName>', 'Entity to publish (if omitted, publishes all)')
+    .action(async (opts: { entity?: string }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getSolutionService();
+      await service.publishCustomizations(opts.entity);
+
+      const scope = opts.entity ? `entity '${opts.entity}'` : 'all entities';
+      console.log(`Published customizations for ${scope}`);
+    });
+
+  program
     .command('publishers')
     .description('List all non-readonly publishers')
     .action(async (_opts: unknown, command: Command) => {

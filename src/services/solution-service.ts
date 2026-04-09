@@ -1,8 +1,8 @@
 /**
  * SolutionService
  *
- * Read-only service for querying solutions, publishers, solution components,
- * and exporting solutions.
+ * Service for querying solutions, publishers, solution components,
+ * exporting solutions, adding components, and publishing customizations.
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
@@ -86,5 +86,46 @@ export class SolutionService {
         ExportExternalApplications: true,
       }
     );
+  }
+
+  /**
+   * Add a component to a solution.
+   * @param solutionUniqueName The unique name of the target solution
+   * @param componentId The GUID of the component
+   * @param componentType Dataverse component type code (1=Entity, 2=Attribute, 14=SDKMessageProcessingStep, 61=WebResource, etc.)
+   * @param addRequiredComponents Whether to also add required dependencies
+   */
+  async addSolutionComponent(
+    solutionUniqueName: string,
+    componentId: string,
+    componentType: number,
+    addRequiredComponents: boolean = false,
+  ): Promise<unknown> {
+    return this.client.post(
+      'api/data/v9.2/AddSolutionComponent',
+      {
+        ComponentId: componentId,
+        ComponentType: componentType,
+        SolutionUniqueName: solutionUniqueName,
+        AddRequiredComponents: addRequiredComponents,
+      },
+    );
+  }
+
+  /**
+   * Publish customizations for an entity or all entities.
+   * @param entityLogicalName If provided, publishes only this entity. Otherwise publishes all.
+   */
+  async publishCustomizations(entityLogicalName?: string): Promise<void> {
+    if (entityLogicalName) {
+      await this.client.post(
+        'api/data/v9.2/PublishXml',
+        {
+          ParameterXml: `<importexportxml><entities><entity>${entityLogicalName}</entity></entities></importexportxml>`,
+        },
+      );
+    } else {
+      await this.client.post('api/data/v9.2/PublishAllXml');
+    }
   }
 }

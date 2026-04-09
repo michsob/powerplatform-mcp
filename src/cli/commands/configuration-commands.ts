@@ -68,6 +68,68 @@ export function registerConfigurationCommands(program: Command, registry: Enviro
     });
 
   program
+    .command('create-environment-variable <schemaName> <displayName>')
+    .description('Create a new environment variable definition')
+    .option('--type <type>', 'Variable type: String, Number, Boolean, JSON, DataSource', 'String')
+    .option('--default-value <val>', 'Default value')
+    .option('--description <desc>', 'Description')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (schemaName: string, displayName: string, opts: {
+      type: string;
+      defaultValue?: string;
+      description?: string;
+      solution?: string;
+    }, command: Command) => {
+      const typeMap: Record<string, number> = {
+        String: 100000000, Number: 100000001, Boolean: 100000002,
+        JSON: 100000003, DataSource: 100000004,
+      };
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getConfigurationService();
+      const result = await service.createEnvironmentVariableDefinition({
+        schemaName, displayName, type: typeMap[opts.type] ?? 100000000,
+        defaultValue: opts.defaultValue, description: opts.description,
+        solutionName: opts.solution,
+      });
+
+      outputResult({
+        fileName: `create-envvar-${schemaName}`,
+        data: result,
+        summary: [
+          `Created environment variable:`,
+          `  Schema Name: ${schemaName}`,
+          `  Display Name: ${displayName}`,
+          `  Type: ${opts.type}`,
+          `  Definition ID: ${result.definitionId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('set-environment-variable-value <definitionId> <value>')
+    .description('Set or update the current value of an environment variable')
+    .option('--existing-value-id <id>', 'Existing value record ID to update')
+    .action(async (definitionId: string, value: string, opts: {
+      existingValueId?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getConfigurationService();
+      const result = await service.setEnvironmentVariableValue({
+        definitionId, value, existingValueId: opts.existingValueId,
+      });
+
+      outputResult({
+        fileName: `set-envvar-value-${definitionId}`,
+        data: result,
+        summary: [
+          `${opts.existingValueId ? 'Updated' : 'Created'} environment variable value:`,
+          `  Definition ID: ${definitionId}`,
+          `  Value ID: ${result.valueId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
     .command('environment-variables')
     .description('List environment variable definitions and their current values')
     .option('--max-records <n>', 'Maximum records to return', '100')
