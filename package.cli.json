@@ -1,6 +1,6 @@
 {
   "name": "powerplatform-cli",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "PowerPlatform CLI — query Dataverse metadata with cached file output",
   "main": "build/cli.js",
   "bin": {

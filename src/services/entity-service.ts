@@ -153,4 +153,96 @@ export class EntityService {
       manyToMany
     };
   }
+
+  /**
+   * Create a string (Single Line of Text) attribute on an entity.
+   * @param entityName The logical name of the entity
+   * @param schemaName The schema name for the new attribute (e.g. br_hospitableid)
+   * @param displayName The display name for the new attribute
+   * @param maxLength Maximum length of the text field (default: 100)
+   * @param requiredLevel Required level: 'None', 'ApplicationRequired', or 'SystemRequired'
+   * @param description Optional description for the attribute
+   */
+  async createStringAttribute(
+    entityName: string,
+    schemaName: string,
+    displayName: string,
+    maxLength: number = 100,
+    requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
+    description?: string,
+    languageCode: number = 1045,
+    solutionName?: string,
+  ): Promise<{ attributeId: string }> {
+    const body: Record<string, unknown> = {
+      '@odata.type': '#Microsoft.Dynamics.CRM.StringAttributeMetadata',
+      SchemaName: schemaName,
+      DisplayName: {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+      },
+      RequiredLevel: { Value: requiredLevel },
+      MaxLength: maxLength,
+      FormatName: { Value: 'Text' },
+    };
+
+    if (description) {
+      body.Description = {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+      };
+    }
+
+    const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      body,
+      headers,
+    );
+
+    return { attributeId: result?.entityId ?? 'created' };
+  }
+
+  /**
+   * Get alternate keys defined on an entity.
+   * @param entityName The logical name of the entity
+   */
+  async getEntityKeys(entityName: string): Promise<ApiCollectionResponse<any>> {
+    return this.client.get<ApiCollectionResponse<any>>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Keys`,
+    );
+  }
+
+  /**
+   * Create an alternate key on an entity.
+   * @param entityName The logical name of the entity
+   * @param schemaName The schema name for the key
+   * @param displayName The display name for the key
+   * @param keyAttributes Array of attribute logical names that make up the key
+   */
+  async createAlternateKey(
+    entityName: string,
+    schemaName: string,
+    displayName: string,
+    keyAttributes: string[],
+    languageCode: number = 1045,
+    solutionName?: string,
+  ): Promise<{ keyId: string }> {
+    const body = {
+      SchemaName: schemaName,
+      DisplayName: {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+      },
+      KeyAttributes: keyAttributes,
+    };
+
+    const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Keys`,
+      body,
+      headers,
+    );
+
+    return { keyId: result?.entityId ?? 'created' };
+  }
 }

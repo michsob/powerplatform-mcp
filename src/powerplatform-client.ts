@@ -129,18 +129,21 @@ export class PowerPlatformClient {
       });
 
       return response.data as T;
-    } catch (error) {
-      console.error('PowerPlatform API request failed:', error);
-      throw new Error(`PowerPlatform API request failed: ${error}`);
+    } catch (error: any) {
+      const detail = error?.response?.data?.error?.message ?? error?.message ?? error;
+      console.error('PowerPlatform API request failed:', detail);
+      throw new Error(`PowerPlatform API request failed: ${detail}`);
     }
   }
 
   /**
-   * Make an authenticated POST request to the PowerPlatform API
+   * Make an authenticated POST request to the PowerPlatform API.
+   * Handles Dataverse 204 responses by extracting the record ID from
+   * the OData-EntityId header when available.
    * @param endpoint The API endpoint (relative to organization URL)
    * @param data The request body
    */
-  async post<T>(endpoint: string, data?: unknown): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
     try {
       const token = await this.getAccessToken();
 
@@ -152,15 +155,82 @@ export class PowerPlatformClient {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
           'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0',
+          ...extraHeaders,
+        },
+        data,
+        validateStatus: (status) => status >= 200 && status < 300,
+      });
+
+      if (response.status === 204) {
+        const entityIdHeader = response.headers['odata-entityid'] as string | undefined;
+        if (entityIdHeader) {
+          const match = entityIdHeader.match(/\(([^)]+)\)/);
+          return { entityId: match ? match[1] : entityIdHeader } as T;
+        }
+        return undefined as T;
+      }
+
+      return response.data as T;
+    } catch (error: any) {
+      const detail = error?.response?.data?.error?.message ?? error?.message ?? error;
+      console.error('PowerPlatform API POST request failed:', detail);
+      throw new Error(`PowerPlatform API POST request failed: ${detail}`);
+    }
+  }
+
+  /**
+   * Make an authenticated PATCH request to the PowerPlatform API.
+   * Used for update and upsert operations. Dataverse returns 204 No Content.
+   * @param endpoint The API endpoint (relative to organization URL)
+   * @param data The request body
+   */
+  async patch(endpoint: string, data?: unknown): Promise<void> {
+    try {
+      const token = await this.getAccessToken();
+
+      await axios({
+        method: 'PATCH',
+        url: `${this.config.organizationUrl}/${endpoint}`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'OData-MaxVersion': '4.0',
           'OData-Version': '4.0'
         },
         data
       });
+    } catch (error: any) {
+      const detail = error?.response?.data?.error?.message ?? error?.message ?? error;
+      console.error('PowerPlatform API PATCH request failed:', detail);
+      throw new Error(`PowerPlatform API PATCH request failed: ${detail}`);
+    }
+  }
 
-      return response.data as T;
-    } catch (error) {
-      console.error('PowerPlatform API POST request failed:', error);
-      throw new Error(`PowerPlatform API POST request failed: ${error}`);
+  /**
+   * Make an authenticated DELETE request to the PowerPlatform API.
+   * Dataverse returns 204 No Content.
+   * @param endpoint The API endpoint (relative to organization URL)
+   */
+  async delete(endpoint: string): Promise<void> {
+    try {
+      const token = await this.getAccessToken();
+
+      await axios({
+        method: 'DELETE',
+        url: `${this.config.organizationUrl}/${endpoint}`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0'
+        }
+      });
+    } catch (error: any) {
+      const detail = error?.response?.data?.error?.message ?? error?.message ?? error;
+      console.error('PowerPlatform API DELETE request failed:', detail);
+      throw new Error(`PowerPlatform API DELETE request failed: ${detail}`);
     }
   }
 }

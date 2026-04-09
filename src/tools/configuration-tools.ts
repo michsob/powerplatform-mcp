@@ -52,6 +52,108 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
     }
   );
 
+  // Create Environment Variable
+  server.registerTool(
+    "create-environment-variable",
+    {
+      title: "Create Environment Variable",
+      description: "Create a new environment variable definition in Dataverse",
+      inputSchema: {
+        schemaName: z.string().describe("The schema name (e.g. br_HospitableApiToken)"),
+        displayName: z.string().describe("The display name"),
+        type: z.enum(["String", "Number", "Boolean", "JSON", "DataSource"]).describe("The variable type"),
+        defaultValue: z.string().optional().describe("Default value"),
+        description: z.string().optional().describe("Description"),
+        solutionName: z.string().optional().describe("Solution unique name to add the component to"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        schemaName: z.string(),
+        definitionId: z.string(),
+      }),
+    },
+    async ({ schemaName, displayName, type, defaultValue, description, solutionName, environment }) => {
+      try {
+        const typeMap: Record<string, number> = {
+          String: 100000000, Number: 100000001, Boolean: 100000002,
+          JSON: 100000003, DataSource: 100000004,
+        };
+        const ctx = registry.getContext(environment);
+        const service = ctx.getConfigurationService();
+        const result = await service.createEnvironmentVariableDefinition({
+          schemaName, displayName, type: typeMap[type], defaultValue, description, solutionName,
+        });
+
+        return {
+          structuredContent: { schemaName, definitionId: result.definitionId },
+          content: [
+            {
+              type: "text",
+              text: `Created environment variable '${schemaName}' (type: ${type}, ID: ${result.definitionId})`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error creating environment variable:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to create environment variable: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  // Set Environment Variable Value
+  server.registerTool(
+    "set-environment-variable-value",
+    {
+      title: "Set Environment Variable Value",
+      description: "Set or update the current value of an environment variable",
+      inputSchema: {
+        definitionId: z.string().describe("The environment variable definition ID"),
+        value: z.string().describe("The value to set"),
+        existingValueId: z.string().optional().describe("Existing value record ID to update (if omitted, creates new)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        valueId: z.string(),
+      }),
+    },
+    async ({ definitionId, value, existingValueId, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getConfigurationService();
+        const result = await service.setEnvironmentVariableValue({
+          definitionId, value, existingValueId,
+        });
+
+        return {
+          structuredContent: { valueId: result.valueId },
+          content: [
+            {
+              type: "text",
+              text: `${existingValueId ? 'Updated' : 'Created'} environment variable value (ID: ${result.valueId})`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error setting environment variable value:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to set environment variable value: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
   // Get Environment Variables
   server.registerTool(
     "get-environment-variables",

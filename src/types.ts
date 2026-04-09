@@ -10,6 +10,8 @@ import type { WorkflowService } from "./services/workflow-service.js";
 import type { ConfigurationService } from "./services/configuration-service.js";
 import type { SecurityRoleService } from "./services/security-role-service.js";
 import type { ServiceEndpointService } from "./services/service-endpoint-service.js";
+import type { CustomApiService } from "./services/customapi-service.js";
+import type { WebResourceService } from "./services/webresource-service.js";
 
 /**
  * Service context providing lazy-initialized service getters.
@@ -29,4 +31,6 @@ export interface ServiceContext {
   getConfigurationService: () => ConfigurationService;
   getSecurityRoleService: () => SecurityRoleService;
   getServiceEndpointService: () => ServiceEndpointService;
+  getCustomApiService: () => CustomApiService;
+  getWebResourceService: () => WebResourceService;
 }

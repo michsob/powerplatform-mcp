@@ -1,8 +1,8 @@
 /**
  * ConfigurationService
  *
- * Read-only service for querying connection references, environment variables,
- * and other environment configuration metadata from Dataverse.
+ * Service for querying and managing connection references, environment variables,
+ * and other environment configuration metadata in Dataverse.
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
@@ -134,5 +134,78 @@ export class ConfigurationService {
     }
 
     return defs;
+  }
+
+  /**
+   * Create an environment variable definition.
+   * @param schemaName The schema name (e.g. br_HospitableApiToken)
+   * @param displayName The display name
+   * @param type Dataverse type code: 100000000=String, 100000001=Number, 100000002=Boolean, 100000003=JSON, 100000004=DataSource
+   * @param defaultValue Optional default value
+   * @param description Optional description
+   */
+  async createEnvironmentVariableDefinition(options: {
+    schemaName: string;
+    displayName: string;
+    type: number;
+    defaultValue?: string;
+    description?: string;
+    solutionName?: string;
+  }): Promise<{ definitionId: string }> {
+    const body: Record<string, unknown> = {
+      schemaname: options.schemaName,
+      displayname: options.displayName,
+      type: options.type,
+    };
+
+    if (options.defaultValue !== undefined) {
+      body.defaultvalue = options.defaultValue;
+    }
+    if (options.description !== undefined) {
+      body.description = options.description;
+    }
+
+    const headers = options.solutionName ? { 'MSCRM.SolutionUniqueName': options.solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      'api/data/v9.2/environmentvariabledefinitions',
+      body,
+      headers,
+    );
+
+    return { definitionId: result?.entityId ?? 'created' };
+  }
+
+  /**
+   * Set or update an environment variable value.
+   * If existingValueId is provided, updates the existing value via PATCH.
+   * Otherwise, creates a new value record linked to the definition.
+   * @param definitionId The environment variable definition ID
+   * @param value The value to set
+   * @param existingValueId Optional existing value record ID to update
+   */
+  async setEnvironmentVariableValue(options: {
+    definitionId: string;
+    value: string;
+    existingValueId?: string;
+  }): Promise<{ valueId: string }> {
+    if (options.existingValueId) {
+      await this.client.patch(
+        `api/data/v9.2/environmentvariablevalues(${options.existingValueId})`,
+        { value: options.value },
+      );
+      return { valueId: options.existingValueId };
+    }
+
+    const body = {
+      value: options.value,
+      'EnvironmentVariableDefinitionId@odata.bind': `/environmentvariabledefinitions(${options.definitionId})`,
+    };
+
+    const result = await this.client.post<{ entityId?: string }>(
+      'api/data/v9.2/environmentvariablevalues',
+      body,
+    );
+
+    return { valueId: result?.entityId ?? 'created' };
   }
 }

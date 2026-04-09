@@ -10,6 +10,8 @@ export { WorkflowService } from './workflow-service.js';
 export { ConfigurationService } from './configuration-service.js';
 export { SecurityRoleService } from './security-role-service.js';
 export { ServiceEndpointService } from './service-endpoint-service.js';
+export { CustomApiService } from './customapi-service.js';
+export { WebResourceService } from './webresource-service.js';
 export { ApiCollectionResponse } from '../models/index.js';
 export { applyFlowFilters } from './flow-filter.js';
 export type { FlowFilterConfig, FilterPatterns, FlowFilterResult, FilterableFlow } from './flow-filter.js';

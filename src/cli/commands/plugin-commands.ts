@@ -1,8 +1,104 @@
+import { readFileSync } from 'node:fs';
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
 
 export function registerPluginCommands(program: Command, registry: EnvironmentRegistry): void {
+  program
+    .command('plugin-packages')
+    .description('List plugin packages in the environment')
+    .option('--include-managed', 'Include managed packages')
+    .option('--max <number>', 'Maximum records', '100')
+    .action(async (opts: { includeManaged?: boolean; max: string }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getPluginService();
+      const result = await service.getPluginPackages(
+        opts.includeManaged ?? false,
+        parseInt(opts.max, 10),
+      );
+
+      const nameList = (result.packages as Array<{ name: string; version: string }>)
+        .slice(0, 10)
+        .map((p) => `${p.name} v${p.version}`)
+        .join(', ');
+
+      outputResult({
+        fileName: 'plugin-packages',
+        data: result,
+        summary: [
+          `Found ${result.totalCount} plugin packages.`,
+          result.totalCount > 0 ? `Packages: ${nameList}${result.totalCount > 10 ? ', ...' : ''}` : '',
+        ].filter(Boolean).join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('register-plugin-package <filePath>')
+    .description('Register a new plugin package (.nupkg) in Dataverse')
+    .requiredOption('--name <name>', 'Display name for the package')
+    .requiredOption('--unique-name <uniqueName>', 'Unique name for the package')
+    .option('--pkg-version <version>', 'Package version', '1.0.0')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (filePath: string, opts: {
+      name: string;
+      uniqueName: string;
+      pkgVersion: string;
+      solution?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getPluginService();
+
+      console.log(`Reading plugin package from ${filePath}...`);
+      const content = readFileSync(filePath).toString('base64');
+
+      console.log(`Uploading plugin package (${(content.length * 0.75 / 1024).toFixed(0)} KB)...`);
+      const result = await service.registerPluginPackage({
+        name: opts.name,
+        uniqueName: opts.uniqueName,
+        version: opts.pkgVersion,
+        content,
+        solutionName: opts.solution,
+      });
+
+      outputResult({
+        fileName: `register-plugin-package-${opts.uniqueName}`,
+        data: result,
+        summary: [
+          `Registered plugin package:`,
+          `  Name: ${opts.name}`,
+          `  Unique Name: ${opts.uniqueName}`,
+          `  Version: ${opts.pkgVersion}`,
+          `  Package ID: ${result.pluginPackageId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('update-plugin-package <filePath>')
+    .description('Update an existing plugin package with new content')
+    .requiredOption('--plugin-package-id <id>', 'ID of the existing plugin package')
+    .option('--pkg-version <version>', 'New version string')
+    .action(async (filePath: string, opts: {
+      pluginPackageId: string;
+      pkgVersion?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getPluginService();
+
+      console.log(`Reading plugin package from ${filePath}...`);
+      const content = readFileSync(filePath).toString('base64');
+
+      console.log(`Uploading updated plugin package (${(content.length * 0.75 / 1024).toFixed(0)} KB)...`);
+      await service.updatePluginPackage({
+        pluginPackageId: opts.pluginPackageId,
+        content,
+        version: opts.pkgVersion,
+      });
+
+      console.log(`Success: plugin package ${opts.pluginPackageId} updated`);
+    });
+
+
   program
     .command('entity-pipeline <entityName>')
     .description('Get plugin pipeline for an entity, organized by message and stage')
@@ -149,6 +245,108 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
           opts.entity ? `  Entity filter: ${opts.entity}` : '',
           opts.message ? `  Message filter: ${opts.message}` : '',
         ].filter(Boolean).join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('plugin-type <typeName>')
+    .description('Look up a plugin type by its fully qualified class name')
+    .action(async (typeName: string, _opts: unknown, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getPluginService();
+      const pluginType = await service.getPluginType(typeName);
+
+      if (!pluginType) {
+        console.error(`Plugin type '${typeName}' not found.`);
+        process.exit(1);
+      }
+
+      outputResult({
+        fileName: `plugin-type-${typeName.replace(/\./g, '-')}`,
+        data: pluginType,
+        summary: [
+          `Plugin Type: ${pluginType.typename}`,
+          `  ID: ${pluginType.plugintypeid}`,
+          `  Assembly: ${pluginType.assemblyname ?? 'N/A'}`,
+          `  Friendly Name: ${pluginType.friendlyname ?? 'N/A'}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('sdk-message <messageName>')
+    .description('Look up an SDK message by name (e.g. Create, Update, br_SyncProperties)')
+    .action(async (messageName: string, _opts: unknown, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getPluginService();
+      const message = await service.getSdkMessage(messageName);
+
+      if (!message) {
+        console.error(`SDK message '${messageName}' not found.`);
+        process.exit(1);
+      }
+
+      outputResult({
+        fileName: `sdk-message-${messageName}`,
+        data: message,
+        summary: [
+          `SDK Message: ${message.name}`,
+          `  ID: ${message.sdkmessageid}`,
+          `  Category: ${message.categoryname ?? 'N/A'}`,
+          `  Active: ${message.isactive}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('create-plugin-step <name> <pluginTypeId> <sdkMessageId>')
+    .description('Register a new plugin step (SDK message processing step)')
+    .option('--stage <n>', 'Execution stage: 10=PreValidation, 20=PreOperation, 40=PostOperation', '40')
+    .option('--mode <n>', 'Execution mode: 0=Synchronous, 1=Asynchronous', '0')
+    .option('--rank <n>', 'Execution order', '1')
+    .option('--supported-deployment <n>', '0=ServerOnly, 1=OfflineOnly, 2=Both', '0')
+    .option('--description <desc>', 'Step description')
+    .option('--configuration <config>', 'Unsecure configuration string')
+    .option('--message-filter-id <id>', 'SDK message filter ID (entity filter)')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (name: string, pluginTypeId: string, sdkMessageId: string, opts: {
+      stage: string;
+      mode: string;
+      rank: string;
+      supportedDeployment: string;
+      description?: string;
+      configuration?: string;
+      messageFilterId?: string;
+      solution?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getPluginService();
+      const stage = parseInt(opts.stage, 10);
+      const mode = parseInt(opts.mode, 10);
+      const result = await service.createPluginStep({
+        name, pluginTypeId, sdkMessageId,
+        stage, mode,
+        rank: parseInt(opts.rank, 10),
+        supportedDeployment: parseInt(opts.supportedDeployment, 10),
+        description: opts.description,
+        configuration: opts.configuration,
+        sdkMessageFilterId: opts.messageFilterId,
+        solutionName: opts.solution,
+      });
+
+      const stageName = stage === 10 ? 'PreValidation' : stage === 20 ? 'PreOperation' : 'PostOperation';
+      const modeName = mode === 0 ? 'Synchronous' : 'Asynchronous';
+
+      outputResult({
+        fileName: `create-plugin-step-${name.replace(/\s+/g, '-').toLowerCase()}`,
+        data: result,
+        summary: [
+          `Created plugin step:`,
+          `  Name: ${name}`,
+          `  Stage: ${stageName} (${stage})`,
+          `  Mode: ${modeName} (${mode})`,
+          `  Step ID: ${result.stepId}`,
+        ].join('\n'),
       }, ctx.environmentName);
     });
 

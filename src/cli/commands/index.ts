@@ -12,6 +12,9 @@ import { registerDependencyCommands } from './dependency-commands.js';
 import { registerConfigurationCommands } from './configuration-commands.js';
 import { registerSecurityRoleCommands } from './security-role-commands.js';
 import { registerServiceEndpointCommands } from './service-endpoint-commands.js';
+import { registerCustomApiCommands } from './customapi-commands.js';
+import { registerWebResourceCommands } from './webresource-commands.js';
+import { registerPacCommands } from './pac-commands.js';
 
 export function registerAllCommands(program: Command, registry: EnvironmentRegistry): void {
   registerEntityCommands(program, registry);
@@ -26,4 +29,7 @@ export function registerAllCommands(program: Command, registry: EnvironmentRegis
   registerConfigurationCommands(program, registry);
   registerSecurityRoleCommands(program, registry);
   registerServiceEndpointCommands(program, registry);
+  registerCustomApiCommands(program, registry);
+  registerWebResourceCommands(program, registry);
+  registerPacCommands(program, registry);
 }

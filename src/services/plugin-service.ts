@@ -1,7 +1,7 @@
 /**
  * PluginService
  *
- * Read-only service for plugin assemblies, types, steps, images, and trace logs.
+ * Service for plugin assemblies, types, steps, images, trace logs, and step registration.
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
@@ -458,6 +458,145 @@ export class PluginService {
       totalCount: steps.length,
       steps,
     };
+  }
+
+  /**
+   * Look up a plugin type by its fully qualified class name (e.g. 'miejskinajem.Plugins.Hospitable.SyncProperties').
+   * Returns the plugin type record or null if not found.
+   */
+  async getPluginType(typeName: string): Promise<Record<string, unknown> | null> {
+    const result = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
+      `api/data/v9.2/plugintypes?$filter=typename eq '${typeName}'&$select=plugintypeid,typename,friendlyname,name,assemblyname&$top=1`,
+    );
+    return result.value && result.value.length > 0 ? result.value[0] : null;
+  }
+
+  /**
+   * Get plugin packages in the environment.
+   */
+  async getPluginPackages(
+    includeManaged: boolean = false,
+    maxRecords: number = 100,
+  ): Promise<{ totalCount: number; packages: unknown[] }> {
+    const managedFilter = includeManaged ? '' : 'ismanaged eq false and ';
+    const result = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
+      `api/data/v9.2/pluginpackages?$filter=${managedFilter}statecode eq 0&$select=pluginpackageid,name,uniquename,version,ismanaged,modifiedon&$orderby=name&$top=${maxRecords}`,
+    );
+
+    return {
+      totalCount: result.value.length,
+      packages: result.value,
+    };
+  }
+
+  /**
+   * Register a new plugin package by uploading a .nupkg file.
+   * @param name Display name for the package
+   * @param uniqueName Unique name for the package
+   * @param version Package version (e.g. "1.0.0")
+   * @param content Base64-encoded .nupkg file content
+   * @param solutionName Optional solution to add the package to
+   */
+  async registerPluginPackage(options: {
+    name: string;
+    uniqueName: string;
+    version: string;
+    content: string;
+    solutionName?: string;
+  }): Promise<{ pluginPackageId: string }> {
+    const body: Record<string, unknown> = {
+      name: options.name,
+      uniquename: options.uniqueName,
+      version: options.version,
+      content: options.content,
+    };
+
+    const headers = options.solutionName ? { 'MSCRM.SolutionUniqueName': options.solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      'api/data/v9.2/pluginpackages',
+      body,
+      headers,
+    );
+
+    return { pluginPackageId: result?.entityId ?? 'created' };
+  }
+
+  /**
+   * Update an existing plugin package with new content.
+   * @param pluginPackageId The ID of the existing plugin package
+   * @param content Base64-encoded .nupkg file content
+   * @param version Optional new version string
+   */
+  async updatePluginPackage(options: {
+    pluginPackageId: string;
+    content: string;
+    version?: string;
+  }): Promise<void> {
+    const body: Record<string, unknown> = {
+      content: options.content,
+    };
+    if (options.version) {
+      body.version = options.version;
+    }
+
+    await this.client.patch(
+      `api/data/v9.2/pluginpackages(${options.pluginPackageId})`,
+      body,
+    );
+  }
+
+  /**
+   * Look up an SDK message by name (e.g. 'Create', 'Update', 'br_SyncProperties').
+   * Returns the message record or null if not found.
+   */
+  async getSdkMessage(messageName: string): Promise<Record<string, unknown> | null> {
+    const result = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
+      `api/data/v9.2/sdkmessages?$filter=name eq '${messageName}'&$select=sdkmessageid,name,categoryname,isactive,isprivate&$top=1`,
+    );
+    return result.value && result.value.length > 0 ? result.value[0] : null;
+  }
+
+  /**
+   * Register a plugin step (SDK message processing step).
+   * @param options Step configuration
+   */
+  async createPluginStep(options: {
+    name: string;
+    pluginTypeId: string;
+    sdkMessageId: string;
+    stage: number;
+    mode: number;
+    rank?: number;
+    supportedDeployment?: number;
+    description?: string;
+    configuration?: string;
+    sdkMessageFilterId?: string;
+    solutionName?: string;
+  }): Promise<{ stepId: string }> {
+    const body: Record<string, unknown> = {
+      name: options.name,
+      'plugintypeid@odata.bind': `/plugintypes(${options.pluginTypeId})`,
+      'sdkmessageid@odata.bind': `/sdkmessages(${options.sdkMessageId})`,
+      stage: options.stage,
+      mode: options.mode,
+      rank: options.rank ?? 1,
+      supporteddeployment: options.supportedDeployment ?? 0,
+    };
+
+    if (options.description) body.description = options.description;
+    if (options.configuration) body.configuration = options.configuration;
+    if (options.sdkMessageFilterId) {
+      body['sdkmessagefilterid@odata.bind'] = `/sdkmessagefilters(${options.sdkMessageFilterId})`;
+    }
+
+    const headers = options.solutionName ? { 'MSCRM.SolutionUniqueName': options.solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      'api/data/v9.2/sdkmessageprocessingsteps',
+      body,
+      headers,
+    );
+
+    return { stepId: result?.entityId ?? 'created' };
   }
 
   private getOperationTypeName(operationType: number): string {

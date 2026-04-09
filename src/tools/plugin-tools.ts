@@ -217,6 +217,166 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
     }
   );
 
+  // Get Plugin Type
+  server.registerTool(
+    "get-plugin-type",
+    {
+      title: "Get Plugin Type",
+      description: "Look up a plugin type by its fully qualified class name (e.g. 'miejskinajem.Plugins.Hospitable.SyncProperties')",
+      inputSchema: {
+        typeName: z.string().describe("The fully qualified class name of the plugin type"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        typeName: z.string(),
+        pluginType: z.any(),
+      }),
+    },
+    async ({ typeName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        const pluginType = await service.getPluginType(typeName);
+
+        if (!pluginType) {
+          return {
+            content: [{ type: "text", text: `Plugin type '${typeName}' not found` }],
+          };
+        }
+
+        return {
+          structuredContent: { typeName, pluginType },
+          content: [
+            {
+              type: "text",
+              text: `Plugin type '${typeName}':\n\n${JSON.stringify(pluginType, null, 2)}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error getting plugin type:", error);
+        return {
+          content: [{ type: "text", text: `Failed to get plugin type: ${error.message}` }],
+        };
+      }
+    }
+  );
+
+  // Get SDK Message
+  server.registerTool(
+    "get-sdk-message",
+    {
+      title: "Get SDK Message",
+      description: "Look up an SDK message by name (e.g. 'Create', 'Update', 'br_SyncProperties'). Returns the message GUID needed for plugin step registration.",
+      inputSchema: {
+        messageName: z.string().describe("The name of the SDK message"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        messageName: z.string(),
+        message: z.any(),
+      }),
+    },
+    async ({ messageName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        const message = await service.getSdkMessage(messageName);
+
+        if (!message) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `SDK message '${messageName}' not found`,
+              },
+            ],
+          };
+        }
+
+        return {
+          structuredContent: { messageName, message },
+          content: [
+            {
+              type: "text",
+              text: `SDK message '${messageName}':\n\n${JSON.stringify(message, null, 2)}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error getting SDK message:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to get SDK message: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  // Create Plugin Step
+  server.registerTool(
+    "create-plugin-step",
+    {
+      title: "Create Plugin Step",
+      description: "Register a new plugin step (SDK message processing step)",
+      inputSchema: {
+        name: z.string().describe("Step name"),
+        pluginTypeId: z.string().describe("GUID of the plugin type to execute"),
+        sdkMessageId: z.string().describe("GUID of the SDK message (e.g. from get-sdk-message)"),
+        stage: z.number().describe("Execution stage: 10=PreValidation, 20=PreOperation, 40=PostOperation"),
+        mode: z.number().describe("Execution mode: 0=Synchronous, 1=Asynchronous"),
+        rank: z.number().optional().describe("Execution order (default: 1)"),
+        supportedDeployment: z.number().optional().describe("0=ServerOnly, 1=OfflineOnly, 2=Both (default: 0)"),
+        description: z.string().optional().describe("Step description"),
+        configuration: z.string().optional().describe("Unsecure configuration string"),
+        sdkMessageFilterId: z.string().optional().describe("GUID of the SDK message filter (entity filter)"),
+        solutionName: z.string().optional().describe("Solution unique name to add the component to"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        name: z.string(),
+        stepId: z.string(),
+      }),
+    },
+    async ({ name, pluginTypeId, sdkMessageId, stage, mode, rank, supportedDeployment, description, configuration, sdkMessageFilterId, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        const result = await service.createPluginStep({
+          name, pluginTypeId, sdkMessageId, stage, mode,
+          rank, supportedDeployment, description, configuration, sdkMessageFilterId, solutionName,
+        });
+
+        const stageName = stage === 10 ? 'PreValidation' : stage === 20 ? 'PreOperation' : 'PostOperation';
+        const modeName = mode === 0 ? 'Synchronous' : 'Asynchronous';
+
+        return {
+          structuredContent: { name, stepId: result.stepId },
+          content: [
+            {
+              type: "text",
+              text: `Created plugin step '${name}' (${stageName}, ${modeName}, ID: ${result.stepId})`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error creating plugin step:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to create plugin step: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
   // Get All Plugin Steps
   server.registerTool(
     "get-all-plugin-steps",

@@ -189,6 +189,97 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
     }
   );
 
+  // Add Solution Component
+  server.registerTool(
+    "add-solution-component",
+    {
+      title: "Add Solution Component",
+      description: "Add a component to a Dataverse solution",
+      inputSchema: {
+        solutionUniqueName: z.string().describe("The unique name of the target solution"),
+        componentId: z.string().describe("The GUID of the component to add"),
+        componentType: z.number().describe("Component type code (1=Entity, 2=Attribute, 14=SDKMessageProcessingStep, 61=WebResource, etc.)"),
+        addRequiredComponents: z.boolean().optional().describe("Also add required dependencies (default: false)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        solutionUniqueName: z.string(),
+        componentId: z.string(),
+        result: z.any(),
+      }),
+    },
+    async ({ solutionUniqueName, componentId, componentType, addRequiredComponents, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getSolutionService();
+        const result = await service.addSolutionComponent(
+          solutionUniqueName, componentId, componentType, addRequiredComponents ?? false,
+        );
+
+        return {
+          structuredContent: { solutionUniqueName, componentId, result },
+          content: [
+            {
+              type: "text",
+              text: `Added component ${componentId} (type: ${componentType}) to solution '${solutionUniqueName}'`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error adding solution component:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to add solution component: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  // Publish Customizations
+  server.registerTool(
+    "publish-customizations",
+    {
+      title: "Publish Customizations",
+      description: "Publish entity customizations or all customizations in Dataverse",
+      inputSchema: {
+        entityLogicalName: z.string().optional().describe("Entity to publish (if omitted, publishes all)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+    },
+    async ({ entityLogicalName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getSolutionService();
+        await service.publishCustomizations(entityLogicalName);
+
+        const scope = entityLogicalName ? `entity '${entityLogicalName}'` : 'all entities';
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Published customizations for ${scope}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error publishing customizations:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to publish customizations: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
   // Export Solution
   server.registerTool(
     "export-solution",
