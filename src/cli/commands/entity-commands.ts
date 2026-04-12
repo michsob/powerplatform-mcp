@@ -115,6 +115,221 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
     });
 
   program
+    .command('create-entity <schemaName> <displayName> <displayCollectionName>')
+    .description('Create a new custom Dataverse entity (table) with a primary name attribute')
+    .option('--primary-name-schema <name>', 'Schema name for the primary name attribute', 'br_Name')
+    .option('--primary-name-display <name>', 'Display name for the primary name attribute', 'Name')
+    .option('--description <desc>', 'Description for the entity')
+    .option('--ownership <type>', 'Ownership type: UserOwned or OrganizationOwned', 'UserOwned')
+    .option('--has-activities', 'Enable activities on the entity', false)
+    .option('--has-notes', 'Enable notes on the entity', false)
+    .option('--solution <name>', 'Solution unique name to add the entity to')
+    .action(async (
+      schemaName: string,
+      displayName: string,
+      displayCollectionName: string,
+      opts: {
+        primaryNameSchema: string;
+        primaryNameDisplay: string;
+        description?: string;
+        ownership: string;
+        hasActivities: boolean;
+        hasNotes: boolean;
+        solution?: string;
+      },
+      command: Command,
+    ) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      const result = await service.createEntity(
+        schemaName,
+        displayName,
+        displayCollectionName,
+        opts.primaryNameSchema,
+        opts.primaryNameDisplay,
+        opts.description,
+        opts.ownership as 'UserOwned' | 'OrganizationOwned',
+        opts.hasActivities,
+        opts.hasNotes,
+        undefined,
+        opts.solution,
+      );
+
+      outputResult({
+        fileName: `create-entity-${schemaName}`,
+        data: result,
+        summary: [
+          `Created entity:`,
+          `  Schema Name: ${schemaName}`,
+          `  Display Name: ${displayName}`,
+          `  Collection Name: ${displayCollectionName}`,
+          `  Primary Name: ${opts.primaryNameSchema} (${opts.primaryNameDisplay})`,
+          `  Ownership: ${opts.ownership}`,
+          `  Entity ID: ${result.entityId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('delete-entity-attribute <entityName> <attributeName>')
+    .description('Delete an attribute from a Dataverse entity (irreversible)')
+    .action(async (entityName: string, attributeName: string, _opts: unknown, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      await service.deleteEntityAttribute(entityName, attributeName);
+
+      outputResult({
+        fileName: `${entityName}-delete-attribute-${attributeName}`,
+        data: { deleted: true, entityName, attributeName },
+        summary: `Deleted attribute '${attributeName}' from '${entityName}'.`,
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('create-entity-money-attribute <entityName> <schemaName> <displayName>')
+    .description('Create a Money (Currency) attribute on a Dataverse entity')
+    .option('--precision-source <n>', 'Precision source: 0 = fixed (use --precision), 1 = pricing, 2 = currency', '2')
+    .option('--precision <n>', 'Display precision when precision-source is 0 (0-4)', '2')
+    .option('--min <n>', 'Minimum allowed value', '-100000000000')
+    .option('--max <n>', 'Maximum allowed value', '100000000000')
+    .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
+    .option('--description <desc>', 'Description for the attribute')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (entityName: string, schemaName: string, displayName: string, opts: {
+      precisionSource: string;
+      precision: string;
+      min: string;
+      max: string;
+      requiredLevel: string;
+      description?: string;
+      solution?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      const result = await service.createMoneyAttribute(
+        entityName, schemaName, displayName,
+        parseInt(opts.precisionSource, 10) as 0 | 1 | 2,
+        parseInt(opts.precision, 10),
+        parseFloat(opts.min),
+        parseFloat(opts.max),
+        opts.requiredLevel as 'None' | 'ApplicationRequired' | 'SystemRequired',
+        opts.description,
+        undefined, opts.solution,
+      );
+
+      outputResult({
+        fileName: `${entityName}-create-money-${schemaName}`,
+        data: result,
+        summary: [
+          `Created money attribute on '${entityName}':`,
+          `  Schema Name: ${schemaName}`,
+          `  Display Name: ${displayName}`,
+          `  Precision Source: ${opts.precisionSource}`,
+          `  Precision: ${opts.precision}`,
+          `  Range: ${opts.min} to ${opts.max}`,
+          `  Required Level: ${opts.requiredLevel}`,
+          `  Attribute ID: ${result.attributeId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('create-entity-decimal-attribute <entityName> <schemaName> <displayName>')
+    .description('Create a Decimal Number attribute on a Dataverse entity')
+    .option('--precision <n>', 'Number of digits after the decimal (0-10)', '2')
+    .option('--min <n>', 'Minimum allowed value', '-100000000000')
+    .option('--max <n>', 'Maximum allowed value', '100000000000')
+    .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
+    .option('--description <desc>', 'Description for the attribute')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (entityName: string, schemaName: string, displayName: string, opts: {
+      precision: string;
+      min: string;
+      max: string;
+      requiredLevel: string;
+      description?: string;
+      solution?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      const result = await service.createDecimalAttribute(
+        entityName, schemaName, displayName,
+        parseInt(opts.precision, 10),
+        parseFloat(opts.min),
+        parseFloat(opts.max),
+        opts.requiredLevel as 'None' | 'ApplicationRequired' | 'SystemRequired',
+        opts.description,
+        undefined, opts.solution,
+      );
+
+      outputResult({
+        fileName: `${entityName}-create-decimal-${schemaName}`,
+        data: result,
+        summary: [
+          `Created decimal attribute on '${entityName}':`,
+          `  Schema Name: ${schemaName}`,
+          `  Display Name: ${displayName}`,
+          `  Precision: ${opts.precision}`,
+          `  Range: ${opts.min} to ${opts.max}`,
+          `  Required Level: ${opts.requiredLevel}`,
+          `  Attribute ID: ${result.attributeId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('create-entity-lookup <referencingEntity> <referencedEntity> <relationshipSchemaName> <lookupSchemaName> <displayName>')
+    .description('Create a lookup (N:1 relationship) column on a Dataverse entity')
+    .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
+    .option('--description <desc>', 'Description for the lookup column')
+    .option('--cascade-delete <mode>', 'Cascade delete behavior: NoCascade, RemoveLink, Restrict, Cascade', 'RemoveLink')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (
+      referencingEntity: string,
+      referencedEntity: string,
+      relationshipSchemaName: string,
+      lookupSchemaName: string,
+      displayName: string,
+      opts: {
+        requiredLevel: string;
+        description?: string;
+        cascadeDelete: string;
+        solution?: string;
+      },
+      command: Command,
+    ) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      const result = await service.createLookupAttribute(
+        referencingEntity,
+        referencedEntity,
+        relationshipSchemaName,
+        lookupSchemaName,
+        displayName,
+        opts.requiredLevel as 'None' | 'ApplicationRequired' | 'SystemRequired',
+        opts.description,
+        opts.cascadeDelete as 'NoCascade' | 'RemoveLink' | 'Restrict' | 'Cascade',
+        undefined,
+        opts.solution,
+      );
+
+      outputResult({
+        fileName: `${referencingEntity}-create-lookup-${lookupSchemaName}`,
+        data: result,
+        summary: [
+          `Created lookup on '${referencingEntity}':`,
+          `  Lookup Schema Name: ${lookupSchemaName}`,
+          `  Display Name: ${displayName}`,
+          `  Points to: ${referencedEntity}`,
+          `  Relationship Name: ${relationshipSchemaName}`,
+          `  Required Level: ${opts.requiredLevel}`,
+          `  Cascade Delete: ${opts.cascadeDelete}`,
+          `  Attribute ID: ${result.attributeId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
     .command('entity-keys <entityName>')
     .description('Get alternate keys defined on a Dataverse entity')
     .action(async (entityName: string, _opts: unknown, command: Command) => {
