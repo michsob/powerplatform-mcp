@@ -171,6 +171,57 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
     });
 
   program
+    .command('create-entity-picklist-attribute <entityName> <schemaName> <displayName>')
+    .description('Create a local Picklist (Choice) attribute on a Dataverse entity')
+    .option('-o, --option <value:label>', 'Option in value:label format (repeatable)', (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
+    .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
+    .option('--description <desc>', 'Description for the attribute')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (entityName: string, schemaName: string, displayName: string, opts: {
+      option: string[];
+      requiredLevel: string;
+      description?: string;
+      solution?: string;
+    }, command: Command) => {
+      if (opts.option.length === 0) {
+        console.error('Error: At least one --option value:label is required.');
+        process.exit(1);
+      }
+
+      const options = opts.option.map(o => {
+        const colonIdx = o.indexOf(':');
+        if (colonIdx < 1) {
+          console.error(`Error: Invalid option format "${o}". Expected value:label (e.g. 100000000:Active).`);
+          process.exit(1);
+        }
+        return { value: parseInt(o.substring(0, colonIdx), 10), label: o.substring(colonIdx + 1) };
+      });
+
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      const result = await service.createPicklistAttribute(
+        entityName, schemaName, displayName, options,
+        opts.requiredLevel as 'None' | 'ApplicationRequired' | 'SystemRequired',
+        opts.description,
+        undefined, opts.solution,
+      );
+
+      const optionList = options.map(o => `    ${o.value} = ${o.label}`).join('\n');
+      outputResult({
+        fileName: `${entityName}-create-picklist-${schemaName}`,
+        data: result,
+        summary: [
+          `Created picklist attribute on '${entityName}':`,
+          `  Schema Name: ${schemaName}`,
+          `  Display Name: ${displayName}`,
+          `  Options:\n${optionList}`,
+          `  Required Level: ${opts.requiredLevel}`,
+          `  Attribute ID: ${result.attributeId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
     .command('delete-entity-attribute <entityName> <attributeName>')
     .description('Delete an attribute from a Dataverse entity (irreversible)')
     .action(async (entityName: string, attributeName: string, _opts: unknown, command: Command) => {

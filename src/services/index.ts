@@ -1,4 +1,5 @@
 export { EntityService } from './entity-service.js';
+export { FormViewService } from './formview-service.js';
 export { RecordService } from './record-service.js';
 export { OptionSetService } from './optionset-service.js';
 export { PluginService } from './plugin-service.js';

@@ -281,6 +281,63 @@ export class EntityService {
   }
 
   /**
+   * Create a local Picklist (Choice / OptionSet) attribute on an entity.
+   *
+   * @param entityName The logical name of the entity
+   * @param schemaName Schema name for the new attribute
+   * @param displayName Display name
+   * @param options Array of { value: number, label: string } defining the picklist options
+   * @param requiredLevel Required level
+   * @param description Optional description
+   * @param languageCode Language code for labels
+   * @param solutionName Optional solution unique name
+   */
+  async createPicklistAttribute(
+    entityName: string,
+    schemaName: string,
+    displayName: string,
+    options: { value: number; label: string }[],
+    requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
+    description?: string,
+    languageCode: number = 1045,
+    solutionName?: string,
+  ): Promise<{ attributeId: string }> {
+    const mkLabel = (text: string) => ({
+      '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+      LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: text, LanguageCode: languageCode }],
+    });
+
+    const body: Record<string, unknown> = {
+      '@odata.type': 'Microsoft.Dynamics.CRM.PicklistAttributeMetadata',
+      SchemaName: schemaName,
+      DisplayName: mkLabel(displayName),
+      RequiredLevel: { Value: requiredLevel },
+      OptionSet: {
+        '@odata.type': 'Microsoft.Dynamics.CRM.OptionSetMetadata',
+        IsGlobal: false,
+        OptionSetType: 'Picklist',
+        Options: options.map(o => ({
+          Value: o.value,
+          Label: mkLabel(o.label),
+        })),
+      },
+    };
+
+    if (description) {
+      body.Description = mkLabel(description);
+    }
+
+    const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      body,
+      headers,
+    );
+
+    return { attributeId: result?.entityId ?? 'created' };
+  }
+
+  /**
    * Delete an attribute from an entity. Irreversible — the column and all data in it are dropped.
    * Fails if any component (form, view, workflow, etc.) still depends on the attribute; use
    * `checkDependencies` first if you need to investigate.
