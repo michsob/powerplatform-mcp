@@ -1,4 +1,5 @@
 import type { EntityService } from "./services/entity-service.js";
+import type { FormViewService } from "./services/formview-service.js";
 import type { RecordService } from "./services/record-service.js";
 import type { OptionSetService } from "./services/optionset-service.js";
 import type { PluginService } from "./services/plugin-service.js";
@@ -20,6 +21,7 @@ import type { WebResourceService } from "./services/webresource-service.js";
 export interface ServiceContext {
   environmentName: string;
   getEntityService: () => EntityService;
+  getFormViewService: () => FormViewService;
   getRecordService: () => RecordService;
   getOptionSetService: () => OptionSetService;
   getPluginService: () => PluginService;

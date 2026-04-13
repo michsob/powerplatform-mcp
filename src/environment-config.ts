@@ -2,6 +2,7 @@ import { PowerPlatformClient } from './powerplatform-client.js';
 import type { PowerPlatformConfig } from './powerplatform-client.js';
 import {
   EntityService,
+  FormViewService,
   RecordService,
   OptionSetService,
   PluginService,
@@ -133,6 +134,7 @@ export class EnvironmentRegistry {
     }
 
     let entityService: EntityService | null = null;
+    let formViewService: FormViewService | null = null;
     let recordService: RecordService | null = null;
     let optionSetService: OptionSetService | null = null;
     let pluginService: PluginService | null = null;
@@ -150,6 +152,7 @@ export class EnvironmentRegistry {
     const ctx: ServiceContext = {
       environmentName: name,
       getEntityService: () => (entityService ??= new EntityService(getClient())),
+      getFormViewService: () => (formViewService ??= new FormViewService(getClient())),
       getRecordService: () => (recordService ??= new RecordService(getClient())),
       getOptionSetService: () => (optionSetService ??= new OptionSetService(getClient())),
       getPluginService: () => (pluginService ??= new PluginService(getClient())),

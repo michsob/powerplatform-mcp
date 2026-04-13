@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { registerEntityCommands } from './entity-commands.js';
+import { registerFormViewCommands } from './formview-commands.js';
 import { registerPluginCommands } from './plugin-commands.js';
 import { registerRecordCommands } from './record-commands.js';
 import { registerFlowCommands } from './flow-commands.js';
@@ -18,6 +19,7 @@ import { registerPacCommands } from './pac-commands.js';
 
 export function registerAllCommands(program: Command, registry: EnvironmentRegistry): void {
   registerEntityCommands(program, registry);
+  registerFormViewCommands(program, registry);
   registerPluginCommands(program, registry);
   registerRecordCommands(program, registry);
   registerFlowCommands(program, registry);
