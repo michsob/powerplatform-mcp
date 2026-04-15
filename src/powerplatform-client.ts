@@ -112,8 +112,9 @@ export class PowerPlatformClient {
   /**
    * Make an authenticated GET request to the PowerPlatform API
    * @param endpoint The API endpoint (relative to organization URL)
+   * @param extraHeaders Optional extra headers (e.g. `Prefer: odata.maxpagesize=500` for pagination)
    */
-  async get<T>(endpoint: string): Promise<T> {
+  async get<T>(endpoint: string, extraHeaders?: Record<string, string>): Promise<T> {
     try {
       const token = await this.getAccessToken();
 
@@ -124,7 +125,8 @@ export class PowerPlatformClient {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
           'OData-MaxVersion': '4.0',
-          'OData-Version': '4.0'
+          'OData-Version': '4.0',
+          ...extraHeaders,
         }
       });
 
