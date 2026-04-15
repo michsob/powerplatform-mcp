@@ -421,14 +421,36 @@ export class PluginService {
     includeDisabled?: boolean;
     maxRecords?: number;
   }): Promise<PluginStepInventoryResult> {
-    const { includeDisabled = true, maxRecords = 500 } = options ?? {};
+    // Dataverse OData's $top is a hard cap that does NOT emit @odata.nextLink; proper
+    // pagination uses the `Prefer: odata.maxpagesize=N` header. Default raised well above
+    // the old 500 cap — orgs routinely have 3000-5000+ steps (most of them OOTB).
+    const { includeDisabled = true, maxRecords = 10000 } = options ?? {};
     const statusFilter = includeDisabled ? '' : 'statuscode eq 1 and ';
+    const pageSize = Math.min(maxRecords, 500);
 
-    const response = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/sdkmessageprocessingsteps?$filter=${statusFilter}ishidden/Value eq false&$select=sdkmessageprocessingstepid,name,stage,mode,rank,statuscode,filteringattributes,ismanaged,modifiedon&$expand=sdkmessageid($select=name),plugintypeid($select=typename,assemblyname)&$orderby=name&$top=${maxRecords}`,
-    );
+    const allRecords: Record<string, unknown>[] = [];
+    let nextUrl: string | null =
+      `api/data/v9.2/sdkmessageprocessingsteps?$filter=${statusFilter}ishidden/Value eq false&$select=sdkmessageprocessingstepid,name,stage,mode,rank,statuscode,filteringattributes,ismanaged,modifiedon&$expand=sdkmessageid($select=name),plugintypeid($select=typename,assemblyname)&$orderby=name`;
+    const preferHeader = { Prefer: `odata.maxpagesize=${pageSize}` };
 
-    const steps: PluginStepInventoryEntry[] = response.value.map((step) => {
+    while (nextUrl && allRecords.length < maxRecords) {
+      const page: ApiCollectionResponse<Record<string, unknown>> = await this.client.get(nextUrl, preferHeader);
+      allRecords.push(...page.value);
+
+      const odataNext = (page as unknown as Record<string, unknown>)['@odata.nextLink'] as string | undefined;
+      if (odataNext && allRecords.length < maxRecords) {
+        const baseUrl = this.client.organizationUrl;
+        nextUrl = odataNext.startsWith(baseUrl)
+          ? odataNext.substring(baseUrl.length + 1)
+          : odataNext;
+      } else {
+        nextUrl = null;
+      }
+    }
+
+    const trimmed = allRecords.slice(0, maxRecords);
+
+    const steps: PluginStepInventoryEntry[] = trimmed.map((step) => {
       const sdkmsg = step.sdkmessageid as { name?: string } | null;
       const pluginType = step.plugintypeid as { typename?: string; assemblyname?: string } | null;
 
