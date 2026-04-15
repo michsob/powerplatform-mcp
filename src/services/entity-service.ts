@@ -30,6 +30,8 @@ export class EntityService {
   async getEntityAttributes(entityName: string): Promise<ApiCollectionResponse<any>> {
     const selectProperties = [
       'LogicalName',
+      'RequiredLevel',
+      'AttributeType',
     ].join(',');
 
     // Make the request to get attributes
@@ -98,7 +100,8 @@ export class EntityService {
       'ReferencingAttribute',
       'ReferencingEntity',
       'ReferencedEntityNavigationPropertyName',
-      'ReferencingEntityNavigationPropertyName'
+      'ReferencingEntityNavigationPropertyName',
+      'CascadeConfiguration'
     ].join(',');
 
     // Only filter by ReferencingAttribute in the OData query since startswith isn't supported
