@@ -354,7 +354,7 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
     .command('all-plugin-steps')
     .description('List all plugin SDK message processing steps across all assemblies')
     .option('--include-disabled', 'Include disabled steps (included by default)')
-    .option('--max <number>', 'Maximum records', '500')
+    .option('--max <number>', 'Maximum records', '10000')
     .action(async (opts: { includeDisabled?: boolean; max: string }, command: Command) => {
       const ctx = registry.getContext(command.optsWithGlobals().env);
       const service = ctx.getPluginService();
