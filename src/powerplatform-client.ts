@@ -184,8 +184,9 @@ export class PowerPlatformClient {
    * Used for update and upsert operations. Dataverse returns 204 No Content.
    * @param endpoint The API endpoint (relative to organization URL)
    * @param data The request body
+   * @param extraHeaders Additional headers (e.g. MSCRM.SolutionUniqueName)
    */
-  async patch(endpoint: string, data?: unknown): Promise<void> {
+  async patch(endpoint: string, data?: unknown, extraHeaders?: Record<string, string>): Promise<void> {
     try {
       const token = await this.getAccessToken();
 
@@ -197,7 +198,8 @@ export class PowerPlatformClient {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
           'OData-MaxVersion': '4.0',
-          'OData-Version': '4.0'
+          'OData-Version': '4.0',
+          ...extraHeaders,
         },
         data
       });
@@ -205,6 +207,38 @@ export class PowerPlatformClient {
       const detail = error?.response?.data?.error?.message ?? error?.message ?? error;
       console.error('PowerPlatform API PATCH request failed:', detail);
       throw new Error(`PowerPlatform API PATCH request failed: ${detail}`);
+    }
+  }
+
+  /**
+   * Make an authenticated PUT request to the PowerPlatform API.
+   * Required for metadata updates (EntityDefinitions etc.) — Dataverse treats metadata
+   * PUT as a full-replace UpdateEntityRequest; partial PATCH is not supported.
+   * @param endpoint The API endpoint (relative to organization URL)
+   * @param data The full entity body
+   * @param extraHeaders Additional headers (e.g. MSCRM.MergeLabels, MSCRM.SolutionUniqueName)
+   */
+  async put(endpoint: string, data?: unknown, extraHeaders?: Record<string, string>): Promise<void> {
+    try {
+      const token = await this.getAccessToken();
+
+      await axios({
+        method: 'PUT',
+        url: `${this.config.organizationUrl}/${endpoint}`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'OData-MaxVersion': '4.0',
+          'OData-Version': '4.0',
+          ...extraHeaders,
+        },
+        data
+      });
+    } catch (error: any) {
+      const detail = error?.response?.data?.error?.message ?? error?.message ?? error;
+      console.error('PowerPlatform API PUT request failed:', detail);
+      throw new Error(`PowerPlatform API PUT request failed: ${detail}`);
     }
   }
 

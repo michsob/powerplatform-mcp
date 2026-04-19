@@ -5,10 +5,10 @@ import type { ApiCollectionResponse } from '../models/index.js';
  * Service for web resource operations.
  * Handles listing, retrieving, and creating web resources.
  *
- * Web resource type values:
+ * Web resource type values (per Microsoft docs):
  *   1=HTML, 2=CSS, 3=JavaScript, 4=XML, 5=PNG,
- *   6=JPG, 7=GIF, 8=Silverlight, 9=StyleSheet,
- *   10=ICO, 11=Vector, 12=SVG
+ *   6=JPG, 7=GIF, 8=Silverlight (XAP), 9=Style Sheet (XSL),
+ *   10=ICO, 11=Vector (SVG), 12=String (RESX)
  */
 export class WebResourceService {
   constructor(private client: PowerPlatformClient) {}
@@ -93,5 +93,46 @@ export class WebResourceService {
     );
 
     return { webResourceId: result?.entityId ?? 'created' };
+  }
+
+  /**
+   * Update an existing web resource's content by id.
+   * Only the `content` field is touched — display name, type, etc. are left alone.
+   */
+  async updateWebResource(webResourceId: string, content: string, solutionName?: string): Promise<void> {
+    const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
+    await this.client.patch(
+      `api/data/v9.2/webresourceset(${webResourceId})`,
+      { content },
+      headers,
+    );
+  }
+
+  /**
+   * Create a new web resource, or update the content of an existing one with the
+   * same name. Returns the web resource id either way. Idempotent across re-runs.
+   */
+  async upsertWebResource(options: {
+    name: string;
+    displayName: string;
+    webResourceType: number;
+    content: string;
+    description?: string;
+    solutionName?: string;
+  }): Promise<{ webResourceId: string; created: boolean }> {
+    const existing = await this.getWebResource(options.name);
+    if (existing) {
+      const id = existing.webresourceid as string;
+      await this.updateWebResource(id, options.content, options.solutionName);
+      return { webResourceId: id, created: false };
+    }
+
+    const created = await this.createWebResource(options);
+    let id = created.webResourceId;
+    if (id === 'created') {
+      const refetched = await this.getWebResource(options.name);
+      id = (refetched?.webresourceid as string) ?? id;
+    }
+    return { webResourceId: id, created: true };
   }
 }

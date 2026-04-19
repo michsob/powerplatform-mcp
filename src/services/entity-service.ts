@@ -155,6 +155,43 @@ export class EntityService {
   }
 
   /**
+   * Set the vector (SVG) icon used for an entity in the unified-interface app nav.
+   * The referenced web resource must already exist and be of type 11 (Vector).
+   *
+   * Dataverse metadata updates can't use PATCH — they require a full-replace PUT
+   * (UpdateEntityRequest semantics). So: fetch full entity metadata, modify the
+   * one field, PUT it back. MergeLabels=true preserves localized labels.
+   *
+   * @param entityName Logical name (e.g. 'br_property')
+   * @param iconVectorName Web-resource name (e.g. 'br_property_icon.svg')
+   * @param solutionName Optional solution to scope the metadata change to
+   */
+  async setEntityIconVector(
+    entityName: string,
+    iconVectorName: string,
+    solutionName?: string,
+  ): Promise<void> {
+    const metadata = await this.client.get<Record<string, unknown> & { MetadataId: string }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')`,
+    );
+
+    const body: Record<string, unknown> = {
+      ...metadata,
+      '@odata.type': 'Microsoft.Dynamics.CRM.EntityMetadata',
+      IconVectorName: iconVectorName,
+    };
+
+    const headers: Record<string, string> = { 'MSCRM.MergeLabels': 'true' };
+    if (solutionName) headers['MSCRM.SolutionUniqueName'] = solutionName;
+
+    await this.client.put(
+      `api/data/v9.2/EntityDefinitions(${metadata.MetadataId})`,
+      body,
+      headers,
+    );
+  }
+
+  /**
    * Create a string (Single Line of Text) attribute on an entity.
    * @param entityName The logical name of the entity
    * @param schemaName The schema name for the new attribute (e.g. br_hospitableid)
@@ -450,6 +487,233 @@ export class EntityService {
       Precision: precision,
       MinValue: minValue,
       MaxValue: maxValue,
+    };
+
+    if (description) {
+      body.Description = {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+      };
+    }
+
+    const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      body,
+      headers,
+    );
+
+    return { attributeId: result?.entityId ?? 'created' };
+  }
+
+  /**
+   * Create a DateTime attribute on an entity.
+   *
+   * @param entityName The logical name of the entity
+   * @param schemaName The schema name for the new attribute
+   * @param displayName The display name
+   * @param format 'DateOnly' or 'DateAndTime' (default 'DateOnly')
+   * @param behavior 'UserLocal', 'DateOnly', or 'TimeZoneIndependent' (default 'UserLocal')
+   * @param requiredLevel Required level
+   * @param description Optional description
+   * @param languageCode Language code for labels
+   * @param solutionName Optional solution unique name
+   */
+  async createDateTimeAttribute(
+    entityName: string,
+    schemaName: string,
+    displayName: string,
+    format: 'DateOnly' | 'DateAndTime' = 'DateOnly',
+    behavior: 'UserLocal' | 'DateOnly' | 'TimeZoneIndependent' = 'UserLocal',
+    requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
+    description?: string,
+    languageCode: number = 1045,
+    solutionName?: string,
+  ): Promise<{ attributeId: string }> {
+    const body: Record<string, unknown> = {
+      '@odata.type': '#Microsoft.Dynamics.CRM.DateTimeAttributeMetadata',
+      SchemaName: schemaName,
+      DisplayName: {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+      },
+      RequiredLevel: { Value: requiredLevel },
+      Format: format,
+      DateTimeBehavior: { Value: behavior },
+    };
+
+    if (description) {
+      body.Description = {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+      };
+    }
+
+    const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      body,
+      headers,
+    );
+
+    return { attributeId: result?.entityId ?? 'created' };
+  }
+
+  /**
+   * Create an Integer (Whole Number) attribute on an entity.
+   *
+   * @param entityName The logical name of the entity
+   * @param schemaName The schema name for the new attribute
+   * @param displayName The display name
+   * @param minValue Minimum allowed value (default -2147483648)
+   * @param maxValue Maximum allowed value (default 2147483647)
+   * @param requiredLevel Required level
+   * @param description Optional description
+   * @param languageCode Language code for labels
+   * @param solutionName Optional solution unique name
+   */
+  async createIntegerAttribute(
+    entityName: string,
+    schemaName: string,
+    displayName: string,
+    minValue: number = -2147483648,
+    maxValue: number = 2147483647,
+    requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
+    description?: string,
+    languageCode: number = 1045,
+    solutionName?: string,
+  ): Promise<{ attributeId: string }> {
+    const body: Record<string, unknown> = {
+      '@odata.type': '#Microsoft.Dynamics.CRM.IntegerAttributeMetadata',
+      SchemaName: schemaName,
+      DisplayName: {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+      },
+      RequiredLevel: { Value: requiredLevel },
+      MinValue: minValue,
+      MaxValue: maxValue,
+    };
+
+    if (description) {
+      body.Description = {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+      };
+    }
+
+    const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      body,
+      headers,
+    );
+
+    return { attributeId: result?.entityId ?? 'created' };
+  }
+
+  /**
+   * Create a Boolean (Two Option / Yes/No) attribute on an entity.
+   *
+   * @param entityName The logical name of the entity
+   * @param schemaName The schema name for the new attribute
+   * @param displayName The display name
+   * @param trueLabel Label for the true/yes option (default 'Yes')
+   * @param falseLabel Label for the false/no option (default 'No')
+   * @param defaultValue Default value (default false)
+   * @param requiredLevel Required level
+   * @param description Optional description
+   * @param languageCode Language code for labels
+   * @param solutionName Optional solution unique name
+   */
+  async createBooleanAttribute(
+    entityName: string,
+    schemaName: string,
+    displayName: string,
+    trueLabel: string = 'Yes',
+    falseLabel: string = 'No',
+    defaultValue: boolean = false,
+    requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
+    description?: string,
+    languageCode: number = 1045,
+    solutionName?: string,
+  ): Promise<{ attributeId: string }> {
+    const body: Record<string, unknown> = {
+      '@odata.type': '#Microsoft.Dynamics.CRM.BooleanAttributeMetadata',
+      SchemaName: schemaName,
+      DisplayName: {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+      },
+      RequiredLevel: { Value: requiredLevel },
+      DefaultValue: defaultValue,
+      OptionSet: {
+        TrueOption: {
+          Value: 1,
+          Label: {
+            '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+            LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: trueLabel, LanguageCode: languageCode }],
+          },
+        },
+        FalseOption: {
+          Value: 0,
+          Label: {
+            '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+            LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: falseLabel, LanguageCode: languageCode }],
+          },
+        },
+      },
+    };
+
+    if (description) {
+      body.Description = {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+      };
+    }
+
+    const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      body,
+      headers,
+    );
+
+    return { attributeId: result?.entityId ?? 'created' };
+  }
+
+  /**
+   * Create a Memo (Multi-Line Text) attribute on an entity.
+   *
+   * @param entityName The logical name of the entity
+   * @param schemaName The schema name for the new attribute
+   * @param displayName The display name
+   * @param maxLength Maximum text length (default 2000)
+   * @param requiredLevel Required level
+   * @param description Optional description
+   * @param languageCode Language code for labels
+   * @param solutionName Optional solution unique name
+   */
+  async createMemoAttribute(
+    entityName: string,
+    schemaName: string,
+    displayName: string,
+    maxLength: number = 2000,
+    requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
+    description?: string,
+    languageCode: number = 1045,
+    solutionName?: string,
+  ): Promise<{ attributeId: string }> {
+    const body: Record<string, unknown> = {
+      '@odata.type': '#Microsoft.Dynamics.CRM.MemoAttributeMetadata',
+      SchemaName: schemaName,
+      DisplayName: {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+      },
+      RequiredLevel: { Value: requiredLevel },
+      MaxLength: maxLength,
+      FormatName: { Value: 'TextArea' },
     };
 
     if (description) {

@@ -101,4 +101,51 @@ export function registerWebResourceCommands(program: Command, registry: Environm
         ].join('\n'),
       }, ctx.environmentName);
     });
+
+  program
+    .command('set-entity-icon <entityName> <svgFilePath>')
+    .description('Upload an SVG (or reuse existing) and set it as the entity icon in Dataverse')
+    .option('--solution <name>', 'Solution unique name to add the webresource/entity to', 'borsocore')
+    .option('--web-resource-name <name>', 'Web resource logical name (default: <entity>_icon.svg)')
+    .option('--display-name <name>', 'Display name for the web resource (default: derived from entity)')
+    .option('--no-publish', 'Skip publishing customizations after setting the icon')
+    .action(async (entityName: string, svgFilePath: string, opts: {
+      solution: string;
+      webResourceName?: string;
+      displayName?: string;
+      publish: boolean;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const webResourceService = ctx.getWebResourceService();
+      const entityService = ctx.getEntityService();
+      const solutionService = ctx.getSolutionService();
+
+      const name = opts.webResourceName ?? `${entityName}_icon.svg`;
+      const displayName = opts.displayName ?? `${entityName} icon`;
+      const base64 = Buffer.from(readFileSync(svgFilePath)).toString('base64');
+
+      const { webResourceId, created } = await webResourceService.upsertWebResource({
+        name,
+        displayName,
+        webResourceType: 11,
+        content: base64,
+        solutionName: opts.solution,
+      });
+
+      await entityService.setEntityIconVector(entityName, name, opts.solution);
+
+      if (opts.publish !== false) {
+        await solutionService.publishCustomizations(entityName);
+      }
+
+      outputResult({
+        fileName: `set-entity-icon-${entityName}`,
+        data: { webResourceId, webResourceName: name, entityName, created },
+        summary: [
+          `${created ? 'Created' : 'Updated'} web resource '${name}' (id: ${webResourceId})`,
+          `Set ${entityName}.IconVectorName = '${name}'`,
+          opts.publish !== false ? `Published customizations for '${entityName}'` : 'Skipped publish',
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
 }

@@ -329,6 +329,169 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
     });
 
   program
+    .command('create-entity-datetime-attribute <entityName> <schemaName> <displayName>')
+    .description('Create a DateTime attribute on a Dataverse entity')
+    .option('--format <fmt>', 'Format: DateOnly or DateAndTime', 'DateOnly')
+    .option('--behavior <beh>', 'Behavior: UserLocal, DateOnly, or TimeZoneIndependent', 'UserLocal')
+    .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
+    .option('--description <desc>', 'Description for the attribute')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (entityName: string, schemaName: string, displayName: string, opts: {
+      format: string;
+      behavior: string;
+      requiredLevel: string;
+      description?: string;
+      solution?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      const result = await service.createDateTimeAttribute(
+        entityName, schemaName, displayName,
+        opts.format as 'DateOnly' | 'DateAndTime',
+        opts.behavior as 'UserLocal' | 'DateOnly' | 'TimeZoneIndependent',
+        opts.requiredLevel as 'None' | 'ApplicationRequired' | 'SystemRequired',
+        opts.description,
+        undefined, opts.solution,
+      );
+
+      outputResult({
+        fileName: `${entityName}-create-datetime-${schemaName}`,
+        data: result,
+        summary: [
+          `Created datetime attribute on '${entityName}':`,
+          `  Schema Name: ${schemaName}`,
+          `  Display Name: ${displayName}`,
+          `  Format: ${opts.format}`,
+          `  Behavior: ${opts.behavior}`,
+          `  Required Level: ${opts.requiredLevel}`,
+          `  Attribute ID: ${result.attributeId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('create-entity-integer-attribute <entityName> <schemaName> <displayName>')
+    .description('Create an Integer (Whole Number) attribute on a Dataverse entity')
+    .option('--min <n>', 'Minimum allowed value', '-2147483648')
+    .option('--max <n>', 'Maximum allowed value', '2147483647')
+    .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
+    .option('--description <desc>', 'Description for the attribute')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (entityName: string, schemaName: string, displayName: string, opts: {
+      min: string;
+      max: string;
+      requiredLevel: string;
+      description?: string;
+      solution?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      const result = await service.createIntegerAttribute(
+        entityName, schemaName, displayName,
+        parseInt(opts.min, 10),
+        parseInt(opts.max, 10),
+        opts.requiredLevel as 'None' | 'ApplicationRequired' | 'SystemRequired',
+        opts.description,
+        undefined, opts.solution,
+      );
+
+      outputResult({
+        fileName: `${entityName}-create-integer-${schemaName}`,
+        data: result,
+        summary: [
+          `Created integer attribute on '${entityName}':`,
+          `  Schema Name: ${schemaName}`,
+          `  Display Name: ${displayName}`,
+          `  Range: ${opts.min} to ${opts.max}`,
+          `  Required Level: ${opts.requiredLevel}`,
+          `  Attribute ID: ${result.attributeId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('create-entity-boolean-attribute <entityName> <schemaName> <displayName>')
+    .description('Create a Boolean (Yes/No) attribute on a Dataverse entity')
+    .option('--true-label <label>', 'Label for the true/yes option', 'Yes')
+    .option('--false-label <label>', 'Label for the false/no option', 'No')
+    .option('--default-value <val>', 'Default value: true or false', 'false')
+    .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
+    .option('--description <desc>', 'Description for the attribute')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (entityName: string, schemaName: string, displayName: string, opts: {
+      trueLabel: string;
+      falseLabel: string;
+      defaultValue: string;
+      requiredLevel: string;
+      description?: string;
+      solution?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      const result = await service.createBooleanAttribute(
+        entityName, schemaName, displayName,
+        opts.trueLabel,
+        opts.falseLabel,
+        opts.defaultValue === 'true',
+        opts.requiredLevel as 'None' | 'ApplicationRequired' | 'SystemRequired',
+        opts.description,
+        undefined, opts.solution,
+      );
+
+      outputResult({
+        fileName: `${entityName}-create-boolean-${schemaName}`,
+        data: result,
+        summary: [
+          `Created boolean attribute on '${entityName}':`,
+          `  Schema Name: ${schemaName}`,
+          `  Display Name: ${displayName}`,
+          `  True Label: ${opts.trueLabel}`,
+          `  False Label: ${opts.falseLabel}`,
+          `  Default: ${opts.defaultValue}`,
+          `  Required Level: ${opts.requiredLevel}`,
+          `  Attribute ID: ${result.attributeId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('create-entity-memo-attribute <entityName> <schemaName> <displayName>')
+    .description('Create a Memo (Multi-Line Text) attribute on a Dataverse entity')
+    .option('--max-length <n>', 'Maximum text length', '2000')
+    .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
+    .option('--description <desc>', 'Description for the attribute')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (entityName: string, schemaName: string, displayName: string, opts: {
+      maxLength: string;
+      requiredLevel: string;
+      description?: string;
+      solution?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      const result = await service.createMemoAttribute(
+        entityName, schemaName, displayName,
+        parseInt(opts.maxLength, 10),
+        opts.requiredLevel as 'None' | 'ApplicationRequired' | 'SystemRequired',
+        opts.description,
+        undefined, opts.solution,
+      );
+
+      outputResult({
+        fileName: `${entityName}-create-memo-${schemaName}`,
+        data: result,
+        summary: [
+          `Created memo attribute on '${entityName}':`,
+          `  Schema Name: ${schemaName}`,
+          `  Display Name: ${displayName}`,
+          `  Max Length: ${opts.maxLength}`,
+          `  Required Level: ${opts.requiredLevel}`,
+          `  Attribute ID: ${result.attributeId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
     .command('create-entity-lookup <referencingEntity> <referencedEntity> <relationshipSchemaName> <lookupSchemaName> <displayName>')
     .description('Create a lookup (N:1 relationship) column on a Dataverse entity')
     .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
