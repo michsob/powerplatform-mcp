@@ -176,6 +176,38 @@ export class ConfigurationService {
   }
 
   /**
+   * Create a connection reference. When solutionName is provided, the
+   * MSCRM.SolutionUniqueName header places it directly in that solution
+   * so a separate AddSolutionComponent call isn't needed.
+   */
+  async createConnectionReference(options: {
+    logicalName: string;
+    displayName: string;
+    connectorId: string;
+    description?: string;
+    solutionName?: string;
+  }): Promise<{ connectionReferenceId: string }> {
+    const body: Record<string, unknown> = {
+      connectionreferencelogicalname: options.logicalName,
+      connectionreferencedisplayname: options.displayName,
+      connectorid: options.connectorId,
+    };
+
+    if (options.description !== undefined) {
+      body.description = options.description;
+    }
+
+    const headers = options.solutionName ? { 'MSCRM.SolutionUniqueName': options.solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      'api/data/v9.2/connectionreferences',
+      body,
+      headers,
+    );
+
+    return { connectionReferenceId: result?.entityId ?? 'created' };
+  }
+
+  /**
    * Set or update an environment variable value.
    * If existingValueId is provided, updates the existing value via PATCH.
    * Otherwise, creates a new value record linked to the definition.

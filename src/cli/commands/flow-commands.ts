@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs';
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
@@ -248,6 +249,69 @@ export function registerFlowCommands(program: Command, registry: EnvironmentRegi
           `  By state: ${stateSummary}`,
           result.excluded > 0 ? `  Excluded: ${result.excluded}` : '',
         ].filter(Boolean).join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('create-cloud-flow <clientDataFile>')
+    .description('Create a modern Cloud Flow (workflow category=5) from a clientdata JSON file. Flow is created in Draft; activate separately.')
+    .requiredOption('--name <name>', 'Flow display name')
+    .option('--primary-entity <entity>', "Primary entity logical name (default: 'none')")
+    .option('--solution <name>', 'Solution unique name (uses MSCRM.SolutionUniqueName so no separate add-solution-component is needed)')
+    .action(async (clientDataFile: string, opts: {
+      name: string;
+      primaryEntity?: string;
+      solution?: string;
+    }, command: Command) => {
+      const clientData = readFileSync(clientDataFile, 'utf-8');
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getFlowService();
+      const result = await service.createCloudFlow({
+        name: opts.name,
+        clientData,
+        primaryEntity: opts.primaryEntity,
+        solutionName: opts.solution,
+      });
+
+      outputResult({
+        fileName: `create-cloud-flow-${opts.name.replace(/\s+/g, '-').toLowerCase()}`,
+        data: result,
+        summary: [
+          `Created Cloud Flow (Draft):`,
+          `  Name: ${opts.name}`,
+          opts.solution ? `  Solution: ${opts.solution}` : '',
+          `  Flow ID: ${result.flowId}`,
+          '',
+          'Next step: activate with `activate-flow <flowId>` (or from the portal if the flow has user-owned connection references).',
+        ].filter(Boolean).join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('activate-flow <flowId>')
+    .description('Activate a Cloud Flow (set statecode=1, statuscode=2)')
+    .action(async (flowId: string, _opts: Record<string, unknown>, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getFlowService();
+      const result = await service.setFlowState(flowId, true);
+      outputResult({
+        fileName: `flow-${flowId}-activate`,
+        data: result,
+        summary: `Flow ${flowId}: ${result.previousState} -> ${result.newState}`,
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('deactivate-flow <flowId>')
+    .description('Deactivate a Cloud Flow (set statecode=0, statuscode=1)')
+    .action(async (flowId: string, _opts: Record<string, unknown>, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getFlowService();
+      const result = await service.setFlowState(flowId, false);
+      outputResult({
+        fileName: `flow-${flowId}-deactivate`,
+        data: result,
+        summary: `Flow ${flowId}: ${result.previousState} -> ${result.newState}`,
       }, ctx.environmentName);
     });
 }

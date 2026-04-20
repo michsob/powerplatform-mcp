@@ -621,6 +621,40 @@ export class PluginService {
     return { stepId: result?.entityId ?? 'created' };
   }
 
+  /**
+   * Register a PreImage or PostImage on an existing SDK message processing step.
+   * Images let a plugin read the row state before/after the operation.
+   * @param options Image configuration
+   */
+  async createPluginStepImage(options: {
+    stepId: string;
+    name?: string;
+    entityAlias?: string;
+    imageType?: number;
+    messagePropertyName?: string;
+    attributes?: string;
+  }): Promise<{ imageId: string }> {
+    const name = options.name ?? 'PreImage';
+    const body: Record<string, unknown> = {
+      name,
+      entityalias: options.entityAlias ?? name,
+      imagetype: options.imageType ?? 0,
+      messagepropertyname: options.messagePropertyName ?? 'Target',
+      'sdkmessageprocessingstepid@odata.bind': `/sdkmessageprocessingsteps(${options.stepId})`,
+    };
+
+    if (options.attributes) {
+      body.attributes = options.attributes;
+    }
+
+    const result = await this.client.post<{ entityId?: string }>(
+      'api/data/v9.2/sdkmessageprocessingstepimages',
+      body,
+    );
+
+    return { imageId: result?.entityId ?? 'created' };
+  }
+
   private getOperationTypeName(operationType: number): string {
     const types: { [key: number]: string } = {
       0: 'None',

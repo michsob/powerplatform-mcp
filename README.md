@@ -65,7 +65,7 @@ For local development, copy `.env.example` to `.env` and fill in your credential
 
 The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilot).
 
-### Available MCP Tools (67)
+### Available MCP Tools (58)
 
 All tools accept an optional `environment` parameter to target a specific environment (defaults to the first configured).
 
@@ -106,7 +106,7 @@ All tools accept an optional `environment` parameter to target a specific enviro
 | Tool | Description | Required Params | Optional |
 |------|-------------|-----------------|----------|
 | `get-flows` | List cloud flows (smart filtering) | | `activeOnly`, `maxRecords`, `nameContains`, `excludeSystem`, `excludeCustomerInsights`, `excludeCopilotSales` |
-| `search-workflows` | Search workflows and flows | | `name`, `primaryEntity`, `description`, `category`, `statecode`, `maxResults` |
+| `search-workflows` | Search workflows and flows | | `name`, `primaryEntity`, `description`, `category`, `statecode`, `includeDescription`, `maxResults` |
 | `get-flow-definition` | Full definition or parsed summary | `flowId` | `summary` |
 | `get-flow-runs` | Flow run history | `flowId` | `status`, `startedAfter`, `startedBefore`, `maxRecords` |
 | `get-flow-run-details` | Run details with action-level errors | `flowId`, `runId` | |
@@ -165,7 +165,7 @@ All tools accept an optional `environment` parameter to target a specific enviro
 | `get-custom-api` | Get a Custom API by unique name | `uniqueName` | |
 | `create-custom-api` | Create a Custom API definition | `uniqueName`, `name`, `displayName`, `bindingType`, `isFunction`, `isPrivate`, `allowedCustomProcessingStepType` | `description`, `pluginTypeId`, `pluginTypeName`, `boundEntityLogicalName`, `solutionName` |
 | `get-custom-api-response-properties` | List response properties | `customApiId` | |
-| `create-custom-api-response-property` | Create a response property | `customApiId`, `uniqueName`, `name`, `displayName`, `type` | `description`, `logicalEntityName`, `solutionName` |
+| `create-custom-api-response-property` | Create a response property | `customApiId`, `uniqueName`, `name`, `displayName`, `type` | `description`, `logicalEntityName`, `isOptional`, `solutionName` |
 | `get-custom-api-request-parameters` | List request parameters | `customApiId` | |
 | `create-custom-api-request-parameter` | Create a request parameter | `customApiId`, `uniqueName`, `name`, `displayName`, `type` | `description`, `logicalEntityName`, `isOptional`, `solutionName` |
 
@@ -224,15 +224,30 @@ entity-metadata <entityName>
 entity-attributes <entityName>
 entity-attribute <entityName> <attributeName>
 entity-relationships <entityName>
-create-entity-string-attribute <entityName> <schemaName> <displayName>  [--max-length <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
 entity-keys <entityName>
+create-entity <schemaName> <displayName> <displayCollectionName>  [--primary-name-schema <name>] [--primary-name-display <name>] [--description <desc>] [--ownership <UserOwned|OrganizationOwned>] [--has-activities] [--has-notes] [--solution <name>]
+create-entity-string-attribute <entityName> <schemaName> <displayName>  [--max-length <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
+create-entity-memo-attribute <entityName> <schemaName> <displayName>  [--max-length <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
+create-entity-integer-attribute <entityName> <schemaName> <displayName>  [--min <n>] [--max <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
+create-entity-decimal-attribute <entityName> <schemaName> <displayName>  [--precision <n>] [--min <n>] [--max <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
+create-entity-money-attribute <entityName> <schemaName> <displayName>  [--precision-source <0|1|2>] [--precision <n>] [--min <n>] [--max <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
+create-entity-boolean-attribute <entityName> <schemaName> <displayName>  [--true-label <label>] [--false-label <label>] [--default-value <true|false>] [--required-level <level>] [--description <desc>] [--solution <name>]
+create-entity-datetime-attribute <entityName> <schemaName> <displayName>  [--format <DateOnly|DateAndTime>] [--behavior <UserLocal|DateOnly|TimeZoneIndependent>] [--required-level <level>] [--description <desc>] [--solution <name>]
+create-entity-picklist-attribute <entityName> <schemaName> <displayName>  [-o <value:label>]... [--required-level <level>] [--description <desc>] [--solution <name>]
+create-entity-lookup <referencingEntity> <referencedEntity> <relationshipSchemaName> <lookupSchemaName> <displayName>  [--required-level <level>] [--description <desc>] [--cascade-delete <NoCascade|RemoveLink|Restrict|Cascade>] [--solution <name>]
 create-entity-alternate-key <entityName> <schemaName> <displayName> <keyAttributes...>  [--solution <name>]
+delete-entity-attribute <entityName> <attributeName>
 ```
 
 #### Records
 ```
 record <entityNamePlural> <recordId>
 query-records <entityNamePlural> <filter>  [--max <n>]
+create-record <entityNamePlural> <jsonBody>
+update-record <entityNamePlural> <recordId> <jsonBody>
+delete-record <entityNamePlural> <recordId>
+associate-records <entityNamePlural> <recordId> <navigationProperty> <relatedEntityNamePlural> <relatedRecordId>
+disassociate-records <entityNamePlural> <recordId> <navigationProperty> [relatedRecordId]
 ```
 
 #### Plugins
@@ -242,19 +257,27 @@ plugin-assembly <assemblyName>             [--include-disabled]
 plugin-packages                            [--include-managed] [--max <n>]
 plugin-type <typeName>
 entity-pipeline <entityName>               [--message <msg>] [--include-disabled]
-plugin-trace-logs                          [--entity <name>] [--message <msg>] [--hours <n>] [--max <n>] [--exceptions-only]
+plugin-trace-logs                          [--entity <name>] [--message <msg>] [--correlation-id <id>] [--step-id <id>] [--hours <n>] [--max <n>] [--exceptions-only]
 all-plugin-steps                           [--include-disabled] [--max <n>]
 sdk-message <messageName>
-register-plugin-package <filePath>         --name <name> --unique-name <uniqueName> [--pkg-version <version>] [--solution <name>]
+register-plugin-package <filePath>         [--pkg-version <version>] [--solution <name>]
 update-plugin-package <filePath>           --plugin-package-id <id> [--pkg-version <version>]
-create-plugin-step <name> <pluginTypeId> <sdkMessageId>  [--stage <n>] [--mode <n>] [--rank <n>] [--solution <name>]
+create-plugin-step <name> <pluginTypeId> <sdkMessageId>  [--stage <n>] [--mode <n>] [--rank <n>] [--supported-deployment <n>] [--description <desc>] [--configuration <cfg>] [--message-filter-id <id>] [--solution <name>]
+create-plugin-step-image <stepId>          [--name <name>] [--entity-alias <alias>] [--image-type <0|1|2>] [--message-property-name <name>] [--attributes <csv>]
 ```
 
 #### Flows
 ```
-flows                                      [--active] [--name <contains>] [--max <n>]
+flows                                      [--active] [--name <contains>] [--include-managed] [--max <n>]
 flow-definition <flowId>                   [--summary]
-search-workflows                           (interactive filters)
+flow-inventory                             [--max <n>]
+flow-runs <flowId>                         [--status <s>] [--after <iso>] [--before <iso>] [--max <n>]
+flow-run-details <flowId> <runId>
+flow-health                                [--days <n>] [--max-runs <n>] [--max-flows <n>] [--active]
+search-workflows                           [--name <name>] [--entity <entity>] [--category <n>] [--active] [--max <n>]
+create-cloud-flow <clientDataFile>         [--primary-entity <entity>] [--solution <name>]
+activate-flow <flowId>
+deactivate-flow <flowId>
 ```
 
 #### Solutions
@@ -262,6 +285,7 @@ search-workflows                           (interactive filters)
 solutions
 solution <uniqueName>
 solution-components <uniqueName>
+publishers
 add-solution-component <solutionUniqueName> <componentId> <componentType>  [--add-required]
 publish-customizations                     [--entity <logicalName>]
 ```
@@ -292,6 +316,7 @@ check-dependencies <componentId> <componentType>
 #### Configuration
 ```
 connection-references                      [--managed-only] [--has-connection] [--no-connection] [--inactive] [--max-records <n>]
+create-connection-reference <logicalName> <displayName> <connectorId>  [--description <desc>] [--solution <name>]
 environment-variables                      [--managed-only] [--max-records <n>]
 create-environment-variable <schemaName> <displayName>  [--type <type>] [--default-value <val>] [--description <desc>] [--solution <name>]
 set-environment-variable-value <definitionId> <value>   [--existing-value-id <id>]
@@ -301,7 +326,7 @@ set-environment-variable-value <definitionId> <value>   [--existing-value-id <id
 ```
 custom-apis                                [--include-managed] [--max <n>]
 custom-api <uniqueName>
-create-custom-api <uniqueName> <displayName>  [--binding-type <n>] [--processing-type <n>] [--plugin-type-id <id>] [--plugin-type-name <name>] [--description <desc>] [--solution <name>]
+create-custom-api <uniqueName> <displayName>  [--binding-type <n>] [--bound-entity <name>] [--is-function] [--is-private] [--processing-type <n>] [--plugin-type-id <id>] [--plugin-type-name <name>] [--description <desc>] [--solution <name>]
 custom-api-response-properties <customApiId>
 create-custom-api-response-property <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--solution <name>]
 custom-api-request-parameters <customApiId>
@@ -313,6 +338,19 @@ create-custom-api-request-parameter <customApiId> <uniqueName> <displayName>  [-
 web-resources                              [--type <n>] [--name <contains>] [--max <n>]
 web-resource <name>
 create-web-resource <name> <displayName> <filePath>  [--type <n>] [--description <desc>] [--solution <name>]
+set-entity-icon <entityName> <svgFilePath>  [--solution <name>] [--web-resource-name <name>] [--display-name <name>] [--no-publish]
+```
+
+#### Forms & Views
+```
+entity-forms <entityName>                  [--type <n>]
+entity-form-fields <formId>
+add-form-field <entityName> <formId> <attributeName>
+remove-form-field <entityName> <formId> <attributeName>
+entity-views <entityName>
+add-view-column <entityName> <viewId> <attributeName>   [--width <n>]
+set-view-columns <entityName> <viewId> <columns...>     [--order-by <attr>] [--desc]
+remove-view-column <entityName> <viewId> <attributeName>
 ```
 
 #### PAC Integration

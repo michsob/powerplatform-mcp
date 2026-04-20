@@ -68,6 +68,41 @@ export function registerConfigurationCommands(program: Command, registry: Enviro
     });
 
   program
+    .command('create-connection-reference <logicalName> <displayName> <connectorId>')
+    .description('Create a connection reference. Pass the full connectorId, e.g. /providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps')
+    .option('--description <desc>', 'Description')
+    .option('--solution <name>', 'Solution unique name (uses MSCRM.SolutionUniqueName so no separate add-solution-component is needed)')
+    .action(async (logicalName: string, displayName: string, connectorId: string, opts: {
+      description?: string;
+      solution?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getConfigurationService();
+      const result = await service.createConnectionReference({
+        logicalName,
+        displayName,
+        connectorId,
+        description: opts.description,
+        solutionName: opts.solution,
+      });
+
+      outputResult({
+        fileName: `create-connection-reference-${logicalName}`,
+        data: result,
+        summary: [
+          `Created connection reference:`,
+          `  Logical Name: ${logicalName}`,
+          `  Display Name: ${displayName}`,
+          `  Connector: ${connectorId}`,
+          opts.solution ? `  Solution: ${opts.solution}` : '',
+          `  Connection Reference ID: ${result.connectionReferenceId}`,
+          '',
+          'Next step: bind this connection reference to an actual connection in make.powerautomate.com.',
+        ].filter(Boolean).join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
     .command('create-environment-variable <schemaName> <displayName>')
     .description('Create a new environment variable definition')
     .option('--type <type>', 'Variable type: String, Number, Boolean, JSON, DataSource', 'String')

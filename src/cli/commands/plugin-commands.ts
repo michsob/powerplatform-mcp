@@ -351,6 +351,48 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
     });
 
   program
+    .command('create-plugin-step-image <stepId>')
+    .description('Register a PreImage or PostImage on an SDK message processing step')
+    .option('--name <name>', 'Image name (plugin reads by this key)', 'PreImage')
+    .option('--entity-alias <alias>', 'Entity alias (defaults to --name)')
+    .option('--image-type <n>', '0=PreImage, 1=PostImage, 2=Both', '0')
+    .option('--message-property-name <name>', 'Target property for CRUD messages', 'Target')
+    .option('--attributes <csv>', 'Comma-separated schema names of columns to include')
+    .action(async (stepId: string, opts: {
+      name: string;
+      entityAlias?: string;
+      imageType: string;
+      messagePropertyName: string;
+      attributes?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getPluginService();
+      const imageType = parseInt(opts.imageType, 10);
+      const result = await service.createPluginStepImage({
+        stepId,
+        name: opts.name,
+        entityAlias: opts.entityAlias,
+        imageType,
+        messagePropertyName: opts.messagePropertyName,
+        attributes: opts.attributes,
+      });
+
+      const typeName = imageType === 0 ? 'PreImage' : imageType === 1 ? 'PostImage' : 'Both';
+      outputResult({
+        fileName: `create-plugin-step-image-${opts.name}`,
+        data: result,
+        summary: [
+          `Created plugin step image:`,
+          `  Name: ${opts.name}`,
+          `  Type: ${typeName} (${imageType})`,
+          `  Step: ${stepId}`,
+          opts.attributes ? `  Attributes: ${opts.attributes}` : `  Attributes: (all)`,
+          `  Image ID: ${result.imageId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
     .command('all-plugin-steps')
     .description('List all plugin SDK message processing steps across all assemblies')
     .option('--include-disabled', 'Include disabled steps (included by default)')
