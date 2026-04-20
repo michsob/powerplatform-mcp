@@ -71,6 +71,20 @@ export interface ResubmitFlowRunResult {
   triggerName: string;
 }
 
+export interface SetFlowStateResult {
+  [key: string]: unknown;
+  success: boolean;
+  flowId: string;
+  previousState: 'Draft' | 'Activated' | 'Unknown';
+  newState: 'Draft' | 'Activated';
+}
+
+export interface CreateCloudFlowResult {
+  [key: string]: unknown;
+  flowId: string;
+  name: string;
+}
+
 export interface FlowRunFilterOptions {
   /** Filter by status: Succeeded, Failed, Running, Waiting, Cancelled */
   status?: string;
@@ -1154,6 +1168,104 @@ export class FlowService {
         `Failed to resubmit flow run: ${err.message} - ${JSON.stringify(errorDetails)}`
       );
     }
+  }
+
+  /**
+   * Create a modern Cloud Flow (workflow with category=5) in Draft state.
+   * `clientData` must be the full flow definition with `schemaVersion` and `properties`
+   * (the outer JSON object, not just the `definition` block). The flow is created in
+   * Draft — activate it separately via setFlowState() once any connection references
+   * are bound.
+   */
+  async createCloudFlow(options: {
+    name: string;
+    clientData: string;
+    primaryEntity?: string;
+    solutionName?: string;
+  }): Promise<CreateCloudFlowResult> {
+    let parsed: { schemaVersion?: unknown; properties?: unknown };
+    try {
+      parsed = JSON.parse(options.clientData);
+    } catch (err) {
+      throw new Error(`clientData is not valid JSON: ${(err as Error).message}`);
+    }
+    if (!parsed.schemaVersion) {
+      throw new Error("clientData is missing top-level 'schemaVersion' (e.g. '1.0.0.0'). Wrap the flow body in { schemaVersion: '1.0.0.0', properties: { ... } }.");
+    }
+    if (!parsed.properties) {
+      throw new Error("clientData is missing top-level 'properties' object.");
+    }
+
+    const body: Record<string, unknown> = {
+      name: options.name,
+      category: 5,
+      type: 1,
+      primaryentity: options.primaryEntity ?? 'none',
+      statecode: 0,
+      statuscode: 1,
+      clientdata: JSON.stringify(parsed),
+    };
+
+    const headers = options.solutionName ? { 'MSCRM.SolutionUniqueName': options.solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      'api/data/v9.2/workflows',
+      body,
+      headers,
+    );
+
+    return {
+      flowId: result?.entityId ?? 'created',
+      name: options.name,
+    };
+  }
+
+  /**
+   * Activate or deactivate a Cloud Flow by toggling its workflow statecode/statuscode
+   * via the Dataverse Web API.
+   *
+   * Gotcha: activating a flow whose connection references are bound to user-owned
+   * connections fails with "ConnectionAuthorizationFailed" when the caller is an SPN
+   * that doesn't own the connection. In that case, activate from the portal once
+   * (Solutions → [solution] → Cloud flows → Turn on) — the error message here
+   * surfaces that hint.
+   */
+  async setFlowState(flowId: string, activate: boolean): Promise<SetFlowStateResult> {
+    let previousState: 'Draft' | 'Activated' | 'Unknown' = 'Unknown';
+    try {
+      const current = await this.client.get<{ statecode: number }>(
+        `api/data/v9.2/workflows(${flowId})?$select=statecode`
+      );
+      previousState = current.statecode === 1 ? 'Activated' : 'Draft';
+    } catch {
+      // Non-fatal — proceed with the PATCH and let the server reject bad ids.
+    }
+
+    const targetState: 'Draft' | 'Activated' = activate ? 'Activated' : 'Draft';
+    const body = activate
+      ? { statecode: 1, statuscode: 2 }
+      : { statecode: 0, statuscode: 1 };
+
+    try {
+      await this.client.patch(`api/data/v9.2/workflows(${flowId})`, body);
+    } catch (error: unknown) {
+      const detail = (error as { message?: string })?.message ?? String(error);
+      if (/ConnectionAuthorizationFailed/i.test(detail)) {
+        throw new Error(
+          `Flow activation blocked by connection authorization. The calling principal ` +
+          `does not own the connection bound to one of this flow's connection references. ` +
+          `Workaround: activate from make.powerautomate.com (Solutions → [solution] → ` +
+          `Cloud flows → Turn on). Underlying error: ${detail}`
+        );
+      }
+      throw error;
+    }
+
+    return {
+      success: true,
+      flowId,
+      previousState,
+      newState: targetState,
+    };
   }
 
   /**
