@@ -65,7 +65,7 @@ For local development, copy `.env.example` to `.env` and fill in your credential
 
 The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilot).
 
-### Available MCP Tools (58)
+### Available MCP Tools (67)
 
 All tools accept an optional `environment` parameter to target a specific environment (defaults to the first configured).
 
@@ -182,7 +182,17 @@ All tools accept an optional `environment` parameter to target a specific enviro
 | Tool | Description | Required Params | Optional |
 |------|-------------|-----------------|----------|
 | `get-security-roles` | List customizable security roles | | `solutionUniqueName`, `excludeSystemRoles`, `includePrivileges`, `maxRecords` |
-| `get-security-role-privileges` | Privileges for a role | `roleId` | `entityFilter`, `accessRightFilter` |
+| `get-security-role-privileges` | Privileges for a role (name, accessright, depth mask) | `roleId` | `entityFilter`, `accessRightFilter` |
+| `list-privileges` | Browse the system privilege catalog to discover `privilegeId` GUIDs and supported depths | | `entityFilter`, `accessRightFilter`, `maxRecords` |
+| `create-security-role` | Create a new role (defaults to root BU); optional `solutionUniqueName` adds it to a solution in one step | `name` | `businessUnitId`, `description`, `solutionUniqueName` |
+| `clone-security-role` | Clone a role with its privileges. Uses `CloneAsRole` with a create-then-copy fallback when the action isn't available | `sourceRoleId` | `newName`, `targetBusinessUnitId`, `solutionUniqueName` |
+| `update-security-role` | Update a role's name, description, or business unit | `roleId` | `name`, `description`, `businessUnitId`, `solutionUniqueName` |
+| `delete-security-role` | Delete a role (destructive — requires `confirm: true`) | `roleId`, `confirm` | |
+| `add-security-role-privileges` | Append privileges to a role (`AddPrivilegesRole` — leaves existing privileges intact) | `roleId`, `privileges[]` | |
+| `remove-security-role-privileges` | Remove privileges from a role (loops `RemovePrivilegeRole`) | `roleId`, `privilegeIds[]` | |
+| `replace-security-role-privileges` | Wipe and replace the full privilege set (`ReplacePrivilegesRole` — destructive, requires `confirm: true`) | `roleId`, `privileges[]`, `confirm` | |
+
+Each item in `privileges[]` is `{ privilegeId, depth, businessUnitId? }`. Depth is one of `Basic` (user), `Local` (BU), `Deep` (BU + child), `Global` (org).
 
 #### Dependencies
 
@@ -364,6 +374,14 @@ deploy-plugin <pluginFile>                 --plugin-id <id> [--type <Nuget|Assem
 ```
 security-roles                             [--solution <name>] [--include-system] [--include-privileges] [--max-records <n>]
 security-role-privileges <roleId>          [--entity <name>] [--access-right <type>]
+privileges                                 [--entity <name>] [--access-right <type>] [--max-records <n>]
+create-security-role                       --name <name> [--bu <id>] [--description <desc>] [--solution <name>]
+clone-security-role <sourceRoleId>         [--name <name>] [--target-bu <id>] [--solution <name>]
+update-security-role <roleId>              [--name <name>] [--description <desc>] [--bu <id>] [--solution <name>]
+delete-security-role <roleId>              --yes
+add-role-privileges <roleId>               --privileges <spec>     # JSON array or shorthand <guid>:<Basic|Local|Deep|Global>,...
+remove-role-privileges <roleId>            --privileges <id,id,id>
+replace-role-privileges <roleId>           --privileges <spec> --yes
 ```
 
 #### Service Endpoints
