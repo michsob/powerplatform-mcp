@@ -7,22 +7,28 @@
 
 import type { PowerPlatformClient } from '../powerplatform-client.js';
 
+interface DependencyResponse {
+  value?: unknown[];
+}
+
 export class DependencyService {
   constructor(private client: PowerPlatformClient) {}
 
   /**
    * Check component dependencies
+   *
+   * RetrieveDependenciesForDelete is an unbound *function*, not an action, so it
+   * is invoked with GET and parenthesised parameters. Posting to it returns
+   * "No HTTP resource was found that matches the request URI". Parameters are
+   * passed as aliases so the GUID needs no inline escaping.
    */
   async checkDependencies(
     componentId: string,
     componentType: number
-  ): Promise<unknown> {
-    return this.client.post(
-      'api/data/v9.2/RetrieveDependenciesForDelete',
-      {
-        ObjectId: componentId,
-        ComponentType: componentType,
-      }
+  ): Promise<DependencyResponse> {
+    return this.client.get<DependencyResponse>(
+      `api/data/v9.2/RetrieveDependenciesForDelete(ObjectId=@p1,ComponentType=@p2)` +
+        `?@p1=${componentId}&@p2=${componentType}`
     );
   }
 
@@ -34,11 +40,11 @@ export class DependencyService {
     componentType: number
   ): Promise<{ canDelete: boolean; dependencies: unknown[] }> {
     try {
-      const result = (await this.checkDependencies(
-        componentId,
-        componentType
-      )) as { EntityCollection?: { Entities?: unknown[] } };
-      const dependencies = result.EntityCollection?.Entities || [];
+      const result = await this.checkDependencies(componentId, componentType);
+      // The Web API returns an OData collection under `value`. Reading a
+      // non-existent `EntityCollection.Entities` yielded an empty array, which
+      // reported components with dependencies as safe to delete.
+      const dependencies = result.value ?? [];
 
       return {
         canDelete: dependencies.length === 0,
@@ -58,7 +64,7 @@ export class DependencyService {
   async checkComponentDependencies(
     componentId: string,
     componentType: number
-  ): Promise<unknown> {
+  ): Promise<DependencyResponse> {
     return this.checkDependencies(componentId, componentType);
   }
 }

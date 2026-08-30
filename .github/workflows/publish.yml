@@ -39,6 +39,23 @@ jobs:
           fi
           echo "Version verified: $TAG_VERSION"
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Every publish job declares `needs: verify`, so a failure here blocks
+      # all of them. Integration tests self-skip without credentials.
+      - name: Test
+        run: npm test
+
   publish-npm-mcp:
     needs: verify
     runs-on: ubuntu-latest

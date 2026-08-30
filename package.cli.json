@@ -1,6 +1,6 @@
 {
   "name": "powerplatform-cli",
-  "version": "2.2.0",
+  "version": "2.4.1",
   "description": "PowerPlatform CLI — query Dataverse metadata with cached file output",
   "main": "build/cli.js",
   "bin": {
@@ -27,7 +27,7 @@
     "url": "git+https://github.com/michsob/powerplatform-mcp.git"
   },
   "engines": {
-    "node": ">=22.0.0 <25.0.0"
+    "node": ">=22.0.0 <27.0.0"
   },
   "dependencies": {
     "@azure/msal-node": "^5.0.2",

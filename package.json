@@ -1,6 +1,6 @@
 {
   "name": "powerplatform-mcp",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "PowerPlatform Model Context Protocol server",
   "main": "build/index.js",
   "bin": {
@@ -8,6 +8,8 @@
   },
   "scripts": {
     "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "npm run build",
     "start": "node build/index.js",
     "dev": "npm run build && npm run start",
@@ -35,7 +37,7 @@
     "url": "git+https://github.com/michsob/powerplatform-mcp.git"
   },
   "engines": {
-    "node": ">=22.0.0 <25.0.0"
+    "node": ">=22.0.0 <27.0.0"
   },
   "dependencies": {
     "@azure/msal-node": "^5.0.2",
