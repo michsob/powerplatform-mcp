@@ -238,6 +238,7 @@ entity-keys <entityName>
 create-entity <schemaName> <displayName> <displayCollectionName>  [--primary-name-schema <name>] [--primary-name-display <name>] [--description <desc>] [--ownership <UserOwned|OrganizationOwned>] [--has-activities] [--has-notes] [--solution <name>]
 create-entity-string-attribute <entityName> <schemaName> <displayName>  [--max-length <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
 create-entity-memo-attribute <entityName> <schemaName> <displayName>  [--max-length <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
+create-entity-file-attribute <entityName> <schemaName> <displayName>  [--max-size-kb <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
 create-entity-integer-attribute <entityName> <schemaName> <displayName>  [--min <n>] [--max <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
 create-entity-decimal-attribute <entityName> <schemaName> <displayName>  [--precision <n>] [--min <n>] [--max <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
 create-entity-money-attribute <entityName> <schemaName> <displayName>  [--precision-source <0|1|2>] [--precision <n>] [--min <n>] [--max <n>] [--required-level <level>] [--description <desc>] [--solution <name>]

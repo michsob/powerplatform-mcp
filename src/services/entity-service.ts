@@ -737,6 +737,57 @@ export class EntityService {
   }
 
   /**
+   * Create a File attribute on an entity. File columns store one file per record
+   * (uploaded/downloaded through the file-column endpoints, not as a plain field value).
+   *
+   * @param entityName The logical name of the entity
+   * @param schemaName The schema name for the new attribute
+   * @param displayName The display name
+   * @param maxSizeInKb Maximum file size in KB (default 32768 = 32 MB; Dataverse allows up to 10 GB)
+   * @param requiredLevel Required level
+   * @param description Optional description
+   * @param languageCode Language code for labels
+   * @param solutionName Optional solution unique name
+   */
+  async createFileAttribute(
+    entityName: string,
+    schemaName: string,
+    displayName: string,
+    maxSizeInKb: number = 32768,
+    requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
+    description?: string,
+    languageCode: number = 1045,
+    solutionName?: string,
+  ): Promise<{ attributeId: string }> {
+    const body: Record<string, unknown> = {
+      '@odata.type': '#Microsoft.Dynamics.CRM.FileAttributeMetadata',
+      SchemaName: schemaName,
+      DisplayName: {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+      },
+      RequiredLevel: { Value: requiredLevel },
+      MaxSizeInKB: maxSizeInKb,
+    };
+
+    if (description) {
+      body.Description = {
+        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+      };
+    }
+
+    const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      body,
+      headers,
+    );
+
+    return { attributeId: result?.entityId ?? 'created' };
+  }
+
+  /**
    * Create a lookup (N:1 relationship) attribute on an entity.
    * Wraps the Dataverse `CreateOneToManyRelationship` action.
    *
