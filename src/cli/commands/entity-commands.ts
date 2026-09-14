@@ -492,6 +492,47 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
     });
 
   program
+    .command('create-entity-file-attribute <entityName> <schemaName> <displayName>')
+    .description('Create a File attribute (one file per record) on a Dataverse entity')
+    .option('--max-size-kb <n>', 'Maximum file size in KB (Dataverse allows up to 10 GB)', '32768')
+    .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
+    .option('--description <desc>', 'Description for the attribute')
+    .option('--solution <name>', 'Solution unique name to add the component to')
+    .action(async (entityName: string, schemaName: string, displayName: string, opts: {
+      maxSizeKb: string;
+      requiredLevel: string;
+      description?: string;
+      solution?: string;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      const maxSizeKb = parseInt(opts.maxSizeKb, 10);
+      if (!Number.isFinite(maxSizeKb) || maxSizeKb <= 0) {
+        throw new Error(`--max-size-kb must be a positive integer, got "${opts.maxSizeKb}"`);
+      }
+      const result = await service.createFileAttribute(
+        entityName, schemaName, displayName,
+        maxSizeKb,
+        opts.requiredLevel as 'None' | 'ApplicationRequired' | 'SystemRequired',
+        opts.description,
+        undefined, opts.solution,
+      );
+
+      outputResult({
+        fileName: `${entityName}-create-file-${schemaName}`,
+        data: result,
+        summary: [
+          `Created file attribute on '${entityName}':`,
+          `  Schema Name: ${schemaName}`,
+          `  Display Name: ${displayName}`,
+          `  Max Size: ${maxSizeKb} KB`,
+          `  Required Level: ${opts.requiredLevel}`,
+          `  Attribute ID: ${result.attributeId}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
     .command('create-entity-lookup <referencingEntity> <referencedEntity> <relationshipSchemaName> <lookupSchemaName> <displayName>')
     .description('Create a lookup (N:1 relationship) column on a Dataverse entity')
     .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
