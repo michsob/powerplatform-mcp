@@ -16,3 +16,5 @@ export { WebResourceService } from './webresource-service.js';
 export { ApiCollectionResponse } from '../models/index.js';
 export { applyFlowFilters } from './flow-filter.js';
 export type { FlowFilterConfig, FilterPatterns, FlowFilterResult, FilterableFlow } from './flow-filter.js';
+export { buildFormXml } from './form-layout.js';
+export type { FormLayoutSpec, FormTabSpec, FormSectionSpec, FormFieldSpec, FormSubgridSpec, FormLayoutResult } from './form-layout.js';
