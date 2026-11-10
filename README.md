@@ -358,11 +358,56 @@ entity-forms <entityName>                  [--type <n>]
 entity-form-fields <formId>
 add-form-field <entityName> <formId> <attributeName>
 remove-form-field <entityName> <formId> <attributeName>
+set-form-layout <entityName> <formId> <layoutFile>       [--dry-run]
 entity-views <entityName>
 add-view-column <entityName> <viewId> <attributeName>   [--width <n>]
-set-view-columns <entityName> <viewId> <columns...>     [--order-by <attr>] [--desc]
+set-view-columns <entityName> <viewId> <columns...>     [--order-by <attr>] [--desc] [--find-columns <a,b>]
+create-view <entityName> <name> <columns...>            [--order-by <attr>] [--desc] [--description <text>] [--state <active|inactive|all>] [--filter-xml <xml>] [--solution <name>]
 remove-view-column <entityName> <viewId> <attributeName>
 ```
+
+`set-view-columns` takes columns as `name:width` (e.g. `si_name:250`) and keeps the view's filters. On a Quick Find view, `--find-columns` also replaces the text and lookup columns the search box matches on.
+
+`create-view` creates a public view on the table. If the table already has a view with that name, it updates that view instead, so you can safely run it again. By default the view lists active records; `--filter-xml` adds extra FetchXML `<filter>` elements.
+
+`set-form-layout` replaces the form's tabs with the layout in a JSON file. It also replaces the header if the file has a `header` key; leave the key out to keep the current header, or set it to `[]` to remove it. Events, libraries, navigation and the footer are kept.
+- **Fields:** an item is a column logical name, or an object when it needs other settings. Labels default to the column's display name, and each control gets the classid for its column type.
+- **Ids:** tab, section and cell ids are derived from the form id and names. Re-applying a layout keeps the same ids.
+- **Checks:** the command rejects unknown or duplicate columns. It lists any custom columns left off the form.
+- **`--dry-run`:** builds the formxml into the cache without saving it.
+
+```json
+{
+  "header": [{ "field": "si_score", "readOnly": true }, "si_band"],
+  "tabs": [{
+    "name": "general", "label": "General",
+    "columns": [
+      { "width": "66%", "sections": [
+        { "name": "details", "label": "Details", "items": ["si_name", { "field": "si_points", "readOnly": true }] },
+        { "name": "points", "label": "Points", "columns": 2, "items": ["si_eventspoints", "si_learningpoints"] },
+        { "name": "touchpoints", "label": "Touchpoints", "showLabel": false, "items": [{
+          "subgrid": "Touchpoints", "label": "Touchpoints", "entity": "si_engagementtouchpoint",
+          "relationship": "si_engagementrun_si_engagementtouchpoint_engagementrunid",
+          "viewId": "9aa3850f-1e0d-4eda-9308-92a535054dc4", "recordsPerPage": 10
+        }] },
+        { "name": "hidden", "label": "Hidden", "visible": false, "items": ["si_state"] }
+      ] },
+      { "width": "34%", "sections": [
+        { "name": "system", "label": "System", "items": [{ "field": "createdon", "readOnly": true }, { "field": "ownerid", "visible": false }] }
+      ] }
+    ]
+  }]
+}
+```
+
+A tab can give `sections` in place of `columns`, as shorthand for a single 100% column. These are the item options:
+
+| Item | Options |
+|------|---------|
+| Field | `field`, `label`, `readOnly`, `visible`, `showLabel` |
+| Subgrid | `subgrid` (control name), `label`, `entity`, `relationship` (leave out to list all records), `viewId`, `recordsPerPage` (default 5), `enableViewPicker`, `enableQuickFind`, `showLabel`, `visible` |
+
+Sections take `name`, `label`, `showLabel`, `visible`, `columns` (1–4) and `items`; tabs take `name`, `label`, `showLabel`, `visible`, `expanded` and `columns` or `sections`. Subgrids are written without `rowspan`: Unified Interface sizes the grid from `recordsPerPage`, and a `rowspan` would hide the cells below it.
 
 #### PAC Integration
 ```
