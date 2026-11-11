@@ -7,6 +7,10 @@
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
 import type { ApiCollectionResponse } from '../models/index.js';
+import { ENVIRONMENT_VARIABLE_TYPES } from './environment-variable-masking.js';
+
+/** Definition ids per value query: keeps the `or` filter well inside the URL length limit. */
+const VALUE_QUERY_CHUNK = 20;
 
 export interface ConnectionReferenceOptions {
   /** Maximum records to return (default: 100) */
@@ -78,8 +82,18 @@ export class ConfigurationService {
 
   /**
    * Get environment variable definitions with their current values.
-   * Fetches definitions and values separately, then joins them,
-   * because $expand on environmentvariablevalues returns 400 on some Dataverse versions.
+   *
+   * Definitions and values are fetched separately and joined, because $expand on
+   * environmentvariablevalues returns 400 on some Dataverse versions. Values are fetched for
+   * the returned definitions only: an unfiltered, capped value query could drop an override
+   * and make a definition look like it uses its default.
+   *
+   * Each definition carries `currentValues` (the value records), `effectiveValue` (the
+   * override, else the default — what a plug-in or flow reading the variable gets),
+   * `valueSource`, `valueModifiedOn` and `typeName`.
+   *
+   * Values come back in clear. Anything printed, cached or handed to an agent goes through
+   * `maskEnvironmentVariables` first.
    */
   async getEnvironmentVariables(
     options: EnvironmentVariableOptions = {}
@@ -99,6 +113,7 @@ export class ConfigurationService {
       'defaultvalue',
       'ismanaged',
       'statecode',
+      'modifiedon',
     ].join(',');
 
     let defsEndpoint =
@@ -111,26 +126,40 @@ export class ConfigurationService {
       defsEndpoint += `&$filter=${filterConditions.join(' and ')}`;
     }
 
-    const [defs, vals] = await Promise.all([
-      this.client.get<ApiCollectionResponse<Record<string, unknown>>>(defsEndpoint),
-      this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-        `api/data/v9.2/environmentvariablevalues` +
-        `?$select=environmentvariablevalueid,schemaname,value,_environmentvariabledefinitionid_value` +
-        `&$top=${maxRecords}`
-      ),
-    ]);
+    const defs = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(defsEndpoint);
+
+    // A definition has at most one value record, so each chunk's answer fits in one page.
+    const defIds = defs.value.map((d) => String(d.environmentvariabledefinitionid));
+    const valueChunks = await Promise.all(
+      Array.from({ length: Math.ceil(defIds.length / VALUE_QUERY_CHUNK) }, (_, i) => {
+        const ids = defIds.slice(i * VALUE_QUERY_CHUNK, (i + 1) * VALUE_QUERY_CHUNK);
+        const filter = ids.map((id) => `_environmentvariabledefinitionid_value eq ${id}`).join(' or ');
+        return this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
+          `api/data/v9.2/environmentvariablevalues` +
+          `?$select=environmentvariablevalueid,schemaname,value,modifiedon,_environmentvariabledefinitionid_value` +
+          `&$filter=${filter}`
+        );
+      }),
+    );
 
     // Join current values onto their definitions
     const valsByDef: Record<string, Record<string, unknown>[]> = {};
-    for (const v of vals.value) {
+    for (const v of valueChunks.flatMap((c) => c.value)) {
       const defId = String(v._environmentvariabledefinitionid_value);
       if (!valsByDef[defId]) valsByDef[defId] = [];
       valsByDef[defId].push(v);
     }
 
     for (const def of defs.value) {
-      (def as Record<string, unknown>).currentValues =
-        valsByDef[String(def.environmentvariabledefinitionid)] || [];
+      const current = valsByDef[String(def.environmentvariabledefinitionid)] || [];
+      const override = current.find((v) => v.value !== null && v.value !== undefined);
+      def.currentValues = current;
+      def.effectiveValue = (override?.value as string | undefined) ?? (def.defaultvalue as string | null) ?? null;
+      def.valueSource = override ? 'value'
+        : def.defaultvalue !== null && def.defaultvalue !== undefined ? 'default'
+          : 'none';
+      def.valueModifiedOn = (override?.modifiedon as string | undefined) ?? null;
+      def.typeName = ENVIRONMENT_VARIABLE_TYPES[def.type as number] ?? `Unknown(${def.type})`;
     }
 
     return defs;

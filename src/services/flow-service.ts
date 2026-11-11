@@ -185,7 +185,13 @@ export interface FlowInventoryResult {
   totalCount: number;
   excluded: number;
   flows: FlowInventoryEntry[];
+  /** True when more flows exist than `requestedMax` let through. */
+  hasMore: boolean;
+  requestedMax: number;
 }
+
+/** Page size for the flow inventory; pages are followed via `@odata.nextLink`. */
+const FLOW_INVENTORY_PAGE_SIZE = 500;
 
 // ─── Concurrency Helper ──────────────────────────────────────────
 
@@ -1412,7 +1418,8 @@ export class FlowService {
   /**
    * Get a complete inventory of all cloud flows.
    * Lighter than scanFlowHealth — returns deployment metadata without run history.
-   * Follows @odata.nextLink for pagination to capture all flows.
+   * Pages with `Prefer: odata.maxpagesize` and follows @odata.nextLink. A `$top` would stop
+   * after one page: Dataverse returns no nextLink for a `$top` query.
    */
   async getFlowInventory(options?: {
     maxRecords?: number;
@@ -1422,14 +1429,19 @@ export class FlowService {
 
     const allRecords: Record<string, unknown>[] = [];
     let nextUrl: string | null =
-      `api/data/v9.2/workflows?$filter=category eq 5&$select=workflowid,name,statecode,statuscode,ismanaged,modifiedon&$expand=modifiedby($select=fullname)&$orderby=name&$top=${Math.min(maxRecords, 500)}`;
+      `api/data/v9.2/workflows?$filter=category eq 5&$select=workflowid,name,statecode,statuscode,ismanaged,modifiedon&$expand=modifiedby($select=fullname)&$orderby=name`;
+    let moreOnServer = false;
 
     while (nextUrl && allRecords.length < maxRecords) {
-      const page: ApiCollectionResponse<Record<string, unknown>> = await this.client.get(nextUrl);
+      const page: ApiCollectionResponse<Record<string, unknown>> = await this.client.get(
+        nextUrl,
+        { Prefer: `odata.maxpagesize=${FLOW_INVENTORY_PAGE_SIZE}` },
+      );
       allRecords.push(...page.value);
 
       const pageAny = page as unknown as Record<string, unknown>;
       const odataNext: string | undefined = pageAny['@odata.nextLink'] as string | undefined;
+      moreOnServer = !!odataNext;
       if (odataNext && allRecords.length < maxRecords) {
         // Use relative URL from the nextLink
         const baseUrl = this.client.organizationUrl;
@@ -1441,6 +1453,7 @@ export class FlowService {
       }
     }
 
+    const hasMore = allRecords.length > maxRecords || moreOnServer;
     const trimmed = allRecords.slice(0, maxRecords);
 
     const flows: FlowInventoryEntry[] = trimmed.map((flow) => ({
@@ -1463,6 +1476,8 @@ export class FlowService {
       totalCount: included.length,
       excluded,
       flows: included,
+      hasMore,
+      requestedMax: maxRecords,
     };
   }
 

@@ -13,7 +13,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
       title: "Get Web Resources",
       description: "List web resources in a PowerPlatform environment with optional type and name filters",
       inputSchema: {
-        webResourceType: z.number().optional().describe("Filter by web resource type (1=HTML, 2=CSS, 3=JavaScript, 4=XML, 5=PNG, 6=JPG, 7=GIF, 8=Silverlight, 9=StyleSheet, 10=ICO, 11=Vector, 12=SVG)"),
+        webResourceType: z.number().optional().describe("Filter by web resource type (1=HTML, 2=CSS, 3=JavaScript, 4=XML, 5=PNG, 6=JPG, 7=GIF, 8=Silverlight, 9=XSL, 10=ICO, 11=SVG, 12=RESX)"),
         nameFilter: z.string().optional().describe("Filter web resources whose name contains this string"),
         maxRecords: z.number().optional().describe("Maximum number of records to return (default: 100)"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
@@ -117,7 +117,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
       inputSchema: {
         name: z.string().describe("The name of the web resource (e.g. 'prefix_/scripts/main.js')"),
         displayName: z.string().describe("The display name of the web resource"),
-        webResourceType: z.number().describe("Web resource type (1=HTML, 2=CSS, 3=JavaScript, 4=XML, 5=PNG, 6=JPG, 7=GIF, 8=Silverlight, 9=StyleSheet, 10=ICO, 11=Vector, 12=SVG)"),
+        webResourceType: z.number().describe("Web resource type (1=HTML, 2=CSS, 3=JavaScript, 4=XML, 5=PNG, 6=JPG, 7=GIF, 8=Silverlight, 9=XSL, 10=ICO, 11=SVG, 12=RESX)"),
         content: z.string().describe("The base64-encoded content of the web resource"),
         description: z.string().optional().describe("Description of the web resource"),
         solutionName: z.string().optional().describe("Solution unique name to add the component to"),

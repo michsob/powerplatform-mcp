@@ -9,6 +9,7 @@ export { FlowService } from './flow-service.js';
 export { SolutionService } from './solution-service.js';
 export { WorkflowService } from './workflow-service.js';
 export { ConfigurationService } from './configuration-service.js';
+export { maskEnvironmentVariables, ENVIRONMENT_VARIABLE_TYPES } from './environment-variable-masking.js';
 export { SecurityRoleService } from './security-role-service.js';
 export { ServiceEndpointService } from './service-endpoint-service.js';
 export { CustomApiService } from './customapi-service.js';

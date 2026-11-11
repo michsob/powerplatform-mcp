@@ -14,7 +14,7 @@ export function registerDependencyTools(server: McpServer, registry: Environment
       description: "Check dependencies for a PowerPlatform component before deletion. Returns all components that depend on the specified component.",
       inputSchema: {
         componentId: z.string().describe("The GUID of the component to check"),
-        componentType: z.number().describe("The component type number (e.g., 1=Entity, 9=OptionSet, 29=Workflow, 80=PluginAssembly, 90=PluginType, 92=SdkMessageProcessingStep)"),
+        componentType: z.number().describe("The component type number (e.g., 1=Entity, 9=OptionSet, 29=Workflow, 80=ModelDrivenApp, 90=PluginType, 91=PluginAssembly, 92=SdkMessageProcessingStep)"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
@@ -60,7 +60,7 @@ export function registerDependencyTools(server: McpServer, registry: Environment
       description: "Check if a PowerPlatform component can be safely deleted. Returns whether deletion is allowed and lists blocking dependencies.",
       inputSchema: {
         componentId: z.string().describe("The GUID of the component to check"),
-        componentType: z.number().describe("The component type number (e.g., 1=Entity, 9=OptionSet, 29=Workflow, 80=PluginAssembly, 90=PluginType, 92=SdkMessageProcessingStep)"),
+        componentType: z.number().describe("The component type number (e.g., 1=Entity, 9=OptionSet, 29=Workflow, 80=ModelDrivenApp, 90=PluginType, 91=PluginAssembly, 92=SdkMessageProcessingStep)"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({

@@ -7,6 +7,17 @@
 import { PowerPlatformClient } from '../powerplatform-client.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
+/** A step's execution stage by name. Stage 30 is the main operation a Custom API's plug-in runs in. */
+export function stageName(stage: unknown): string {
+  switch (stage) {
+    case 10: return 'PreValidation';
+    case 20: return 'PreOperation';
+    case 30: return 'MainOperation';
+    case 40: return 'PostOperation';
+    default: return `Unknown(${String(stage)})`;
+  }
+}
+
 export interface PluginStepInventoryEntry {
   stepId: string;
   name: string;
@@ -41,10 +52,13 @@ export class PluginService {
     includeManaged: boolean = false,
     maxRecords: number = 100
   ): Promise<{ totalCount: number; assemblies: unknown[] }> {
-    const managedFilter = includeManaged ? '' : '$filter=ismanaged eq false&';
+    // Hidden assemblies are excluded in the query itself. Dropping them after `$top` meant
+    // the cap counted rows nobody saw, so `--max 200` could return far fewer than 200.
+    const filters = ['ishidden/Value eq false'];
+    if (!includeManaged) filters.push('ismanaged eq false');
 
     const assemblies = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/pluginassemblies?${managedFilter}$select=pluginassemblyid,name,version,culture,publickeytoken,isolationmode,sourcetype,major,minor,createdon,modifiedon,ismanaged,ishidden&$expand=modifiedby($select=fullname)&$orderby=name&$top=${maxRecords}`
+      `api/data/v9.2/pluginassemblies?$filter=${filters.join(' and ')}&$select=pluginassemblyid,name,version,culture,publickeytoken,isolationmode,sourcetype,major,minor,createdon,modifiedon,ismanaged,ishidden&$expand=modifiedby($select=fullname)&$orderby=name&$top=${maxRecords}`
     );
 
     // Filter out hidden assemblies and format results
@@ -161,14 +175,12 @@ export class PluginService {
       hasDisabledSteps: allSteps.some((s) => s.statuscode !== 1),
       hasAsyncSteps: allSteps.some((s) => s.mode === 1),
       hasSyncSteps: allSteps.some((s) => s.mode === 0),
+      // Filtering attributes apply to the Update message only; Dataverse ignores them on
+      // every other message, so a Delete step has no columns to filter on.
       stepsWithoutFilteringAttributes: stepsWithImages
         .filter((s) => {
           const sdkmsg = s.sdkmessageid as { name?: string } | undefined;
-          const msgName = sdkmsg?.name;
-          return (
-            (msgName === 'Update' || msgName === 'Delete') &&
-            !s.filteringattributes
-          );
+          return sdkmsg?.name === 'Update' && !s.filteringattributes;
         })
         .map((s) => s.name as string),
       stepsWithoutImages: stepsWithImages
@@ -186,7 +198,7 @@ export class PluginService {
 
     if (validation.stepsWithoutFilteringAttributes.length > 0) {
       validation.potentialIssues.push(
-        `${validation.stepsWithoutFilteringAttributes.length} Update/Delete steps without filtering attributes (performance concern)`
+        `${validation.stepsWithoutFilteringAttributes.length} Update steps without filtering attributes (performance concern)`
       );
     }
     if (validation.stepsWithoutImages.length > 0) {
@@ -274,12 +286,7 @@ export class PluginService {
         sdkmessageprocessingstepid: step.sdkmessageprocessingstepid,
         name: step.name,
         stage: step.stage,
-        stageName:
-          step.stage === 10
-            ? 'PreValidation'
-            : step.stage === 20
-              ? 'PreOperation'
-              : 'PostOperation',
+        stageName: stageName(step.stage),
         mode: step.mode,
         modeName: step.mode === 0 ? 'Synchronous' : 'Asynchronous',
         rank: step.rank,
@@ -318,6 +325,7 @@ export class PluginService {
         stages: {
           preValidation: unknown[];
           preOperation: unknown[];
+          mainOperation: unknown[];
           postOperation: unknown[];
         };
       }
@@ -330,6 +338,7 @@ export class PluginService {
           stages: {
             preValidation: [],
             preOperation: [],
+            mainOperation: [],
             postOperation: [],
           },
         });
@@ -337,6 +346,7 @@ export class PluginService {
       const msg = messageGroups.get(step.message as string)!;
       if (step.stage === 10) msg.stages.preValidation.push(step);
       else if (step.stage === 20) msg.stages.preOperation.push(step);
+      else if (step.stage === 30) msg.stages.mainOperation.push(step);
       else if (step.stage === 40) msg.stages.postOperation.push(step);
     });
 
@@ -382,7 +392,9 @@ export class PluginService {
     if (correlationId) filters.push(`correlationid eq '${correlationId}'`);
     if (pluginStepId)
       filters.push(`_sdkmessageprocessingstepid_value eq ${pluginStepId}`);
-    if (exceptionOnly) filters.push(`exceptiondetails ne null`);
+    // A trace without an exception stores exceptiondetails as '' rather than null, so
+    // `ne null` alone matched every row.
+    if (exceptionOnly) filters.push(`exceptiondetails ne null and exceptiondetails ne ''`);
 
     const filterString = filters.join(' and ');
 
@@ -459,10 +471,7 @@ export class PluginService {
         name: step.name as string,
         messageName: sdkmsg?.name ?? 'Unknown',
         stage: step.stage as number,
-        stageName:
-          step.stage === 10 ? 'PreValidation'
-            : step.stage === 20 ? 'PreOperation'
-              : 'PostOperation',
+        stageName: stageName(step.stage),
         mode: step.mode as number,
         modeName: step.mode === 0 ? 'Synchronous' : 'Asynchronous',
         statuscode: step.statuscode as number,
@@ -655,16 +664,15 @@ export class PluginService {
     return { imageId: result?.entityId ?? 'created' };
   }
 
+  /**
+   * `plugintracelog.operationtype` says what kind of code wrote the trace — a plug-in or a
+   * custom workflow activity — not which SDK message ran; that is `messagename`.
+   */
   private getOperationTypeName(operationType: number): string {
     const types: { [key: number]: string } = {
-      0: 'None',
-      1: 'Create',
-      2: 'Update',
-      3: 'Delete',
-      4: 'Retrieve',
-      5: 'RetrieveMultiple',
-      6: 'Associate',
-      7: 'Disassociate',
+      0: 'Unknown',
+      1: 'Plug-in',
+      2: 'Workflow Activity',
     };
     return types[operationType] || 'Unknown';
   }

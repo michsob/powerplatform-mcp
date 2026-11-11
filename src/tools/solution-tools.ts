@@ -198,7 +198,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       inputSchema: {
         solutionUniqueName: z.string().describe("The unique name of the target solution"),
         componentId: z.string().describe("The GUID of the component to add"),
-        componentType: z.number().describe("Component type code (1=Entity, 2=Attribute, 14=SDKMessageProcessingStep, 61=WebResource, etc.)"),
+        componentType: z.number().describe("Component type code (1=Entity, 2=Attribute, 9=OptionSet, 26=View, 29=Process, 60=SystemForm, 61=WebResource, 80=ModelDrivenApp, 90=PluginType, 91=PluginAssembly, 92=SdkMessageProcessingStep, 93=SdkMessageProcessingStepImage, 300=CanvasApp, 380=EnvironmentVariableDefinition, etc.)"),
         addRequiredComponents: z.boolean().optional().describe("Also add required dependencies (default: false)"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },

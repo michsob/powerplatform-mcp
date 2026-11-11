@@ -7,7 +7,7 @@ export function registerWebResourceCommands(program: Command, registry: Environm
   program
     .command('web-resources')
     .description('List web resources in a Dataverse environment')
-    .option('--type <n>', 'Filter by web resource type (1=HTML, 2=CSS, 3=JS, 4=XML, 5=PNG, 6=JPG, 7=GIF, 8=Silverlight, 9=StyleSheet, 10=ICO, 11=Vector, 12=SVG)')
+    .option('--type <n>', 'Filter by web resource type (1=HTML, 2=CSS, 3=JS, 4=XML, 5=PNG, 6=JPG, 7=GIF, 8=Silverlight, 9=XSL, 10=ICO, 11=SVG, 12=RESX)')
     .option('--name <contains>', 'Filter web resources whose name contains this string')
     .option('--max <n>', 'Maximum number of records to return', '100')
     .action(async (opts: { type?: string; name?: string; max: string }, command: Command) => {
@@ -66,7 +66,7 @@ export function registerWebResourceCommands(program: Command, registry: Environm
   program
     .command('create-web-resource <name> <displayName> <filePath>')
     .description('Create a new web resource by uploading a file')
-    .option('--type <n>', 'Web resource type (1=HTML, 2=CSS, 3=JS, 4=XML, 5=PNG, 6=JPG, 7=GIF, 8=Silverlight, 9=StyleSheet, 10=ICO, 11=Vector, 12=SVG)', '3')
+    .option('--type <n>', 'Web resource type (1=HTML, 2=CSS, 3=JS, 4=XML, 5=PNG, 6=JPG, 7=GIF, 8=Silverlight, 9=XSL, 10=ICO, 11=SVG, 12=RESX)', '3')
     .option('--description <desc>', 'Description for the web resource')
     .option('--solution <name>', 'Solution unique name to add the component to')
     .action(async (name: string, displayName: string, filePath: string, opts: {
@@ -105,12 +105,12 @@ export function registerWebResourceCommands(program: Command, registry: Environm
   program
     .command('set-entity-icon <entityName> <svgFilePath>')
     .description('Upload an SVG (or reuse existing) and set it as the entity icon in Dataverse')
-    .option('--solution <name>', 'Solution unique name to add the webresource/entity to', 'ContosoCore')
+    .option('--solution <name>', 'Solution unique name to add the webresource/entity to')
     .option('--web-resource-name <name>', 'Web resource logical name (default: <entity>_icon.svg)')
     .option('--display-name <name>', 'Display name for the web resource (default: derived from entity)')
     .option('--no-publish', 'Skip publishing customizations after setting the icon')
     .action(async (entityName: string, svgFilePath: string, opts: {
-      solution: string;
+      solution?: string;
       webResourceName?: string;
       displayName?: string;
       publish: boolean;

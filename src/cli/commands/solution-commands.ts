@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
+import { componentTypeName } from '../../services/solution-service.js';
 
 export function registerSolutionCommands(program: Command, registry: EnvironmentRegistry): void {
   program
@@ -69,17 +70,9 @@ export function registerSolutionCommands(program: Command, registry: Environment
         typeCounts[c.componenttype] = (typeCounts[c.componenttype] || 0) + 1;
       }
 
-      const typeNames: Record<number, string> = {
-        1: 'Entity', 2: 'Attribute', 3: 'Relationship', 9: 'OptionSet',
-        10: 'EntityRelationship', 26: 'View', 29: 'Process', 59: 'Chart',
-        60: 'Form', 61: 'WebResource', 62: 'SiteMap', 63: 'ConnectionRole',
-        65: 'Assembly', 91: 'PluginStep', 92: 'PluginStepImage',
-        300: 'CanvasApp', 371: 'Connector',
-      };
-
       const breakdown = Object.entries(typeCounts)
         .sort(([, a], [, b]) => b - a)
-        .map(([type, count]) => `${typeNames[parseInt(type)] ?? `Type ${type}`}: ${count}`)
+        .map(([type, count]) => `${componentTypeName(parseInt(type, 10))}: ${count}`)
         .join(', ');
 
       outputResult({
