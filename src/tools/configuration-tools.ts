@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { maskEnvironmentVariables } from "../services/environment-variable-masking.js";
 
 /**
  * Register configuration tools with the MCP server.
@@ -159,7 +160,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
     "get-environment-variables",
     {
       title: "Get Environment Variables",
-      description: "Get environment variable definitions and their current values from the PowerPlatform environment",
+      description: "Get environment variable definitions with their value records and effective value (override, else default) from the PowerPlatform environment. Values of Secret-type variables, of credential-named variables, of JSON values with a credential-named key and of credential-like values are masked as '*** (N chars)'; valueMasked, maskReason and plaintextCredential (a literal credential, not a Key Vault reference) say which and why",
       inputSchema: {
         maxRecords: z.number().optional().describe("Maximum number of records to return (default: 100)"),
         managedOnly: z.boolean().optional().describe("Only return managed environment variables (default: false)"),
@@ -173,7 +174,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getConfigurationService();
-        const result = await service.getEnvironmentVariables({ maxRecords, managedOnly });
+        const result = maskEnvironmentVariables(await service.getEnvironmentVariables({ maxRecords, managedOnly }));
 
         return {
           structuredContent: { environmentVariables: result.value },

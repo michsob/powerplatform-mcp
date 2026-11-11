@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { stageName } from "../services/plugin-service.js";
 
 /**
  * Register plugin tools with the MCP server.
@@ -351,7 +352,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
           rank, supportedDeployment, description, configuration, sdkMessageFilterId, solutionName,
         });
 
-        const stageName = stage === 10 ? 'PreValidation' : stage === 20 ? 'PreOperation' : 'PostOperation';
+        const stageLabel = stageName(stage);
         const modeName = mode === 0 ? 'Synchronous' : 'Asynchronous';
 
         return {
@@ -359,7 +360,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
           content: [
             {
               type: "text",
-              text: `Created plugin step '${name}' (${stageName}, ${modeName}, ID: ${result.stepId})`,
+              text: `Created plugin step '${name}' (${stageLabel}, ${modeName}, ID: ${result.stepId})`,
             },
           ],
         };

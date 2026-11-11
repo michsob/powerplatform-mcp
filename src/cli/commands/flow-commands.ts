@@ -248,6 +248,7 @@ export function registerFlowCommands(program: Command, registry: EnvironmentRegi
           `Flow inventory: ${result.totalCount} flows`,
           `  By state: ${stateSummary}`,
           result.excluded > 0 ? `  Excluded: ${result.excluded}` : '',
+          result.hasMore ? `  ⚠ Stopped at --max ${result.requestedMax}; more flows exist. Raise --max to see them all.` : '',
         ].filter(Boolean).join('\n'),
       }, ctx.environmentName);
     });

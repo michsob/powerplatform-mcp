@@ -8,6 +8,23 @@
 import { PowerPlatformClient } from '../powerplatform-client.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
+/** `solutioncomponent.componenttype` labels for the component types met most often. */
+export const COMPONENT_TYPE_NAMES: Record<number, string> = {
+  1: 'Entity', 2: 'Attribute', 3: 'Relationship', 9: 'OptionSet', 10: 'EntityRelationship',
+  14: 'EntityKey', 20: 'SecurityRole', 24: 'Form', 26: 'View', 29: 'Process', 31: 'Report',
+  36: 'EmailTemplate', 44: 'DuplicateRule', 59: 'Chart', 60: 'SystemForm', 61: 'WebResource',
+  62: 'SiteMap', 63: 'ConnectionRole', 65: 'HierarchyRule', 66: 'CustomControl',
+  70: 'FieldSecurityProfile', 80: 'ModelDrivenApp', 90: 'PluginType', 91: 'PluginAssembly',
+  92: 'SdkMessageProcessingStep', 93: 'SdkMessageProcessingStepImage', 95: 'ServiceEndpoint',
+  150: 'RoutingRule', 152: 'SLA', 161: 'MobileOfflineProfile', 300: 'CanvasApp', 371: 'Connector',
+  372: 'Connector', 380: 'EnvironmentVariableDefinition', 381: 'EnvironmentVariableValue',
+  400: 'AIProjectType', 401: 'AIProject', 402: 'AIConfiguration',
+};
+
+export function componentTypeName(componentType: number): string {
+  return COMPONENT_TYPE_NAMES[componentType] ?? `Type ${componentType}`;
+}
+
 export class SolutionService {
   constructor(private client: PowerPlatformClient) {}
 
@@ -52,9 +69,16 @@ export class SolutionService {
       throw new Error(`Solution '${solutionUniqueName}' not found`);
     }
 
-    return this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
+    const components = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
       `api/data/v9.2/solutioncomponents?$filter=_solutionid_value eq ${solution.solutionid}&$orderby=componenttype`
     );
+    return {
+      ...components,
+      value: components.value.map((c) => ({
+        ...c,
+        componentTypeName: componentTypeName(c.componenttype as number),
+      })),
+    };
   }
 
   /**
@@ -92,7 +116,7 @@ export class SolutionService {
    * Add a component to a solution.
    * @param solutionUniqueName The unique name of the target solution
    * @param componentId The GUID of the component
-   * @param componentType Dataverse component type code (1=Entity, 2=Attribute, 14=SDKMessageProcessingStep, 61=WebResource, etc.)
+   * @param componentType Dataverse component type code (see COMPONENT_TYPE_NAMES: 1=Entity, 2=Attribute, 61=WebResource, 91=PluginAssembly, 92=SdkMessageProcessingStep, etc.)
    * @param addRequiredComponents Whether to also add required dependencies
    */
   async addSolutionComponent(

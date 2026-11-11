@@ -34,9 +34,13 @@ const CONTRACT_NAMES: Record<number, string> = {
   2: 'Queue',
   3: 'REST',
   4: 'Two-Way',
+  5: 'Topic',
+  6: 'Persistent Queue',
   7: 'EventHub',
   8: 'Webhook',
   9: 'EventGrid',
+  10: 'Managed Data Lake',
+  11: 'Container Storage',
 };
 
 const CONNECTION_MODE_NAMES: Record<number, string> = {

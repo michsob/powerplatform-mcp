@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
+import { ENVIRONMENT_VARIABLE_TYPES, maskEnvironmentVariables } from '../../services/environment-variable-masking.js';
 
 export function registerConfigurationCommands(program: Command, registry: EnvironmentRegistry): void {
   program
@@ -169,20 +170,21 @@ export function registerConfigurationCommands(program: Command, registry: Enviro
     .description('List environment variable definitions and their current values')
     .option('--max-records <n>', 'Maximum records to return', '100')
     .option('--managed-only', 'Only show managed environment variables')
-    .action(async (opts: { maxRecords: string; managedOnly?: boolean }, command: Command) => {
+    .option('--show-values', 'Print and cache credential values in clear (masked by default)')
+    .action(async (opts: { maxRecords: string; managedOnly?: boolean; showValues?: boolean }, command: Command) => {
       const ctx = registry.getContext(command.optsWithGlobals().env);
       const service = ctx.getConfigurationService();
-      const result = await service.getEnvironmentVariables({
+      const raw = await service.getEnvironmentVariables({
         maxRecords: parseInt(opts.maxRecords, 10),
         managedOnly: opts.managedOnly,
       });
+      // The cache file holds what is printed: masked unless the values were asked for.
+      const result = opts.showValues ? raw : maskEnvironmentVariables(raw);
       const vars = result.value || [];
+      const masked = vars.filter((v) => v.valueMasked === true);
+      const plaintext = masked.filter((v) => v.plaintextCredential === true);
 
-      // Map numeric type codes to labels
-      const typeMap: Record<number, string> = {
-        100000000: 'String', 100000001: 'Number', 100000002: 'Boolean',
-        100000003: 'JSON', 100000004: 'Data Source',
-      };
+      const typeMap = ENVIRONMENT_VARIABLE_TYPES;
 
       // Count by type
       const typeCounts: Record<string, number> = {};
@@ -199,9 +201,8 @@ export function registerConfigurationCommands(program: Command, registry: Enviro
       const nameList = vars
         .slice(0, 10)
         .map((v: Record<string, unknown>) => {
-          const cv = v.currentValues as Array<Record<string, unknown>> | undefined;
-          const hasOverride = cv && cv.length > 0;
-          return `${v.displayname || v.schemaname} (${hasOverride ? 'overridden' : 'default'}, managed: ${v.ismanaged})`;
+          const source = v.valueSource === 'value' ? 'overridden' : v.valueSource;
+          return `${v.displayname || v.schemaname} (${source}, ${v.typeName}, managed: ${v.ismanaged}${v.valueMasked ? ', value masked' : ''})`;
         })
         .join('\n    ');
 
@@ -212,6 +213,13 @@ export function registerConfigurationCommands(program: Command, registry: Enviro
           `Found ${vars.length} environment variables:`,
           breakdown ? `  By type: ${breakdown}` : '',
           vars.length > 0 ? `  Variables:\n    ${nameList}${vars.length > 10 ? '\n    ...' : ''}` : '',
+          masked.length > 0
+            ? `  Masked: ${masked.length} credential value(s) shown as *** (length); --show-values prints them`
+            : '',
+          plaintext.length > 0
+            ? `  ⚠ ${plaintext.length} credential-like variable(s) hold a literal value, not a Key Vault reference: ${plaintext.map((v) => v.schemaname).join(', ')}`
+            : '',
+          opts.showValues ? '  ⚠ --show-values: credential values are in clear on screen and in the cache file' : '',
         ].filter(Boolean).join('\n'),
       }, ctx.environmentName);
     });

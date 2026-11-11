@@ -153,7 +153,7 @@ All tools accept an optional `environment` parameter to target a specific enviro
 | Tool | Description | Required Params | Optional |
 |------|-------------|-----------------|----------|
 | `get-connection-references` | Connection references | | `maxRecords`, `managedOnly`, `hasConnection`, `inactive` |
-| `get-environment-variables` | Environment variable definitions + values | | `maxRecords`, `managedOnly` |
+| `get-environment-variables` | Environment variable definitions + values, with the effective value (credential values masked) | | `maxRecords`, `managedOnly` |
 | `create-environment-variable` | Create an environment variable definition | `schemaName`, `displayName`, `type` | `defaultValue`, `description`, `solutionName` |
 | `set-environment-variable-value` | Set or update an environment variable value | `definitionId`, `value` | `existingValueId` |
 
@@ -328,10 +328,12 @@ check-dependencies <componentId> <componentType>
 ```
 connection-references                      [--managed-only] [--has-connection] [--no-connection] [--inactive] [--max-records <n>]
 create-connection-reference <logicalName> <displayName> <connectorId>  [--description <desc>] [--solution <name>]
-environment-variables                      [--managed-only] [--max-records <n>]
+environment-variables                      [--managed-only] [--max-records <n>] [--show-values]
 create-environment-variable <schemaName> <displayName>  [--type <type>] [--default-value <val>] [--description <desc>] [--solution <name>]
 set-environment-variable-value <definitionId> <value>   [--existing-value-id <id>]
 ```
+
+`environment-variables` and the `get-environment-variables` tool mask credential values as `*** (N chars)`. A value is masked when the variable is Secret-type, its name looks like a credential (secret, password, key, token, connection string, …), the value itself looks like one (a JWT, `AccountKey=`, `Bearer …`), or it is JSON with a credential-named key. Each variable says `valueMasked` and `maskReason`. `plaintextCredential` flags a literal credential stored in place of a Key Vault reference. The MCP tool always masks; the CLI prints and caches values in clear only with `--show-values`.
 
 #### Custom APIs
 ```

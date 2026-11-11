@@ -444,7 +444,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
           content: [
             {
               type: "text",
-              text: `Flow inventory: ${result.totalCount} flows (${result.excluded} excluded):\n\n${JSON.stringify(result.flows, null, 2)}`,
+              text: `Flow inventory: ${result.totalCount} flows (${result.excluded} excluded)${result.hasMore ? ` — stopped at maxRecords ${result.requestedMax}, more flows exist` : ''}:\n\n${JSON.stringify(result.flows, null, 2)}`,
             },
           ],
         };

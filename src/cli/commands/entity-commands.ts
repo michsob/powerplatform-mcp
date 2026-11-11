@@ -2,6 +2,12 @@ import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
 
+/** `<prefix>_Name` for an entity schema name such as `contoso_Project`; the prefix must match the publisher's. */
+export function defaultPrimaryNameSchema(entitySchemaName: string): string {
+  const underscore = entitySchemaName.indexOf('_');
+  return underscore > 0 ? `${entitySchemaName.slice(0, underscore)}_Name` : 'Name';
+}
+
 export function registerEntityCommands(program: Command, registry: EnvironmentRegistry): void {
   program
     .command('entity-metadata <entityName>')
@@ -117,7 +123,7 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
   program
     .command('create-entity <schemaName> <displayName> <displayCollectionName>')
     .description('Create a new custom Dataverse entity (table) with a primary name attribute')
-    .option('--primary-name-schema <name>', 'Schema name for the primary name attribute', 'contoso_Name')
+    .option('--primary-name-schema <name>', 'Schema name for the primary name attribute (default: <prefix>_Name, from the entity schema name)')
     .option('--primary-name-display <name>', 'Display name for the primary name attribute', 'Name')
     .option('--description <desc>', 'Description for the entity')
     .option('--ownership <type>', 'Ownership type: UserOwned or OrganizationOwned', 'UserOwned')
@@ -129,7 +135,7 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
       displayName: string,
       displayCollectionName: string,
       opts: {
-        primaryNameSchema: string;
+        primaryNameSchema?: string;
         primaryNameDisplay: string;
         description?: string;
         ownership: string;
@@ -145,7 +151,7 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
         schemaName,
         displayName,
         displayCollectionName,
-        opts.primaryNameSchema,
+        opts.primaryNameSchema ?? defaultPrimaryNameSchema(schemaName),
         opts.primaryNameDisplay,
         opts.description,
         opts.ownership as 'UserOwned' | 'OrganizationOwned',
@@ -163,7 +169,7 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
           `  Schema Name: ${schemaName}`,
           `  Display Name: ${displayName}`,
           `  Collection Name: ${displayCollectionName}`,
-          `  Primary Name: ${opts.primaryNameSchema} (${opts.primaryNameDisplay})`,
+          `  Primary Name: ${opts.primaryNameSchema ?? defaultPrimaryNameSchema(schemaName)} (${opts.primaryNameDisplay})`,
           `  Ownership: ${opts.ownership}`,
           `  Entity ID: ${result.entityId}`,
         ].join('\n'),

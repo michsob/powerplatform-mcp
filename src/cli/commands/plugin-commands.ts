@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
+import { stageName } from '../../services/plugin-service.js';
 
 export function registerPluginCommands(program: Command, registry: EnvironmentRegistry): void {
   program
@@ -116,10 +117,11 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
       const suffix = opts.message ? `-${opts.message.toLowerCase()}` : '';
 
       // Count steps by stage
-      const stages = { preValidation: 0, preOperation: 0, postOperation: 0 };
+      const stages = { preValidation: 0, preOperation: 0, mainOperation: 0, postOperation: 0 };
       for (const step of result.steps as Array<{ stage: number }>) {
         if (step.stage === 10) stages.preValidation++;
         else if (step.stage === 20) stages.preOperation++;
+        else if (step.stage === 30) stages.mainOperation++;
         else if (step.stage === 40) stages.postOperation++;
       }
 
@@ -135,7 +137,7 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
           `Plugin pipeline for '${entityName}'${opts.message ? ` (${opts.message})` : ''}:`,
           `  Total steps: ${result.steps.length}`,
           `  Messages: ${result.messages.length}`,
-          `  PreValidation: ${stages.preValidation}, PreOperation: ${stages.preOperation}, PostOperation: ${stages.postOperation}`,
+          `  PreValidation: ${stages.preValidation}, PreOperation: ${stages.preOperation}, ${stages.mainOperation > 0 ? `MainOperation: ${stages.mainOperation}, ` : ''}PostOperation: ${stages.postOperation}`,
           result.executionOrder.length > 0 ? `  Execution order:` : '',
           ...orderPreview,
           moreCount > 0 ? `    ... and ${moreCount} more` : '',
@@ -334,7 +336,7 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
         solutionName: opts.solution,
       });
 
-      const stageName = stage === 10 ? 'PreValidation' : stage === 20 ? 'PreOperation' : 'PostOperation';
+      const stageLabel = stageName(stage);
       const modeName = mode === 0 ? 'Synchronous' : 'Asynchronous';
 
       outputResult({
@@ -343,7 +345,7 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
         summary: [
           `Created plugin step:`,
           `  Name: ${name}`,
-          `  Stage: ${stageName} (${stage})`,
+          `  Stage: ${stageLabel} (${stage})`,
           `  Mode: ${modeName} (${mode})`,
           `  Step ID: ${result.stepId}`,
         ].join('\n'),
