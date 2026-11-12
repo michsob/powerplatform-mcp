@@ -1,4 +1,5 @@
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { odataGuid, odataInteger, odataString } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 import { randomUUID } from 'crypto';
 import { buildFormXml } from './form-layout.js';
@@ -66,8 +67,8 @@ export class FormViewService {
    */
   async getEntityForms(entityLogicalName: string, type?: number): Promise<FormSummary[]> {
     // objecttypecode on systemforms accepts the entity logical name as a string.
-    let filter = `objecttypecode eq '${entityLogicalName}'`;
-    if (type !== undefined) filter += ` and type eq ${type}`;
+    let filter = `objecttypecode eq ${odataString(entityLogicalName)}`;
+    if (type !== undefined) filter += ` and type eq ${odataInteger(type, 'type')}`;
 
     const result = await this.client.get<ApiCollectionResponse<FormSummary>>(
       `api/data/v9.2/systemforms?$select=formid,name,type,description&$filter=${filter}`,
@@ -81,7 +82,7 @@ export class FormViewService {
    */
   async getFormFields(formId: string): Promise<string[]> {
     const form = await this.client.get<{ formxml: string }>(
-      `api/data/v9.2/systemforms(${formId})?$select=formxml`,
+      `api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})?$select=formxml`,
     );
     const xml = form.formxml ?? '';
     const fields: string[] = [];
@@ -103,7 +104,7 @@ export class FormViewService {
    */
   async addFormField(formId: string, attributeName: string, entityLogicalName: string): Promise<{ added: boolean }> {
     const form = await this.client.get<{ formxml: string }>(
-      `api/data/v9.2/systemforms(${formId})?$select=formxml`,
+      `api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})?$select=formxml`,
     );
     let xml = form.formxml ?? '';
 
@@ -124,7 +125,7 @@ export class FormViewService {
     xml = xml.substring(0, rowsCloseIdx) + newRow + xml.substring(rowsCloseIdx);
 
     // Patch the form.
-    await this.client.patch(`api/data/v9.2/systemforms(${formId})`, { formxml: xml });
+    await this.client.patch(`api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})`, { formxml: xml });
 
     // Publish the entity.
     await this.publishEntity(entityLogicalName);
@@ -142,7 +143,7 @@ export class FormViewService {
    */
   async removeFormField(formId: string, attributeName: string, entityLogicalName: string): Promise<{ removed: boolean }> {
     const form = await this.client.get<{ formxml: string }>(
-      `api/data/v9.2/systemforms(${formId})?$select=formxml`,
+      `api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})?$select=formxml`,
     );
     let xml = form.formxml ?? '';
 
@@ -156,7 +157,7 @@ export class FormViewService {
       return { removed: false };
     }
 
-    await this.client.patch(`api/data/v9.2/systemforms(${formId})`, { formxml: newXml });
+    await this.client.patch(`api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})`, { formxml: newXml });
     await this.publishEntity(entityLogicalName);
 
     return { removed: true };
@@ -171,7 +172,7 @@ export class FormViewService {
   async getEntityViews(entityLogicalName: string): Promise<ViewSummary[]> {
     // returnedtypecode on savedqueries accepts the entity logical name as a string.
     const result = await this.client.get<ApiCollectionResponse<ViewSummary>>(
-      `api/data/v9.2/savedqueries?$select=savedqueryid,name,querytype,isdefault,description&$filter=returnedtypecode eq '${entityLogicalName}'`,
+      `api/data/v9.2/savedqueries?$select=savedqueryid,name,querytype,isdefault,description&$filter=returnedtypecode eq ${odataString(entityLogicalName)}`,
     );
     return result.value ?? [];
   }
@@ -181,7 +182,7 @@ export class FormViewService {
    */
   async getViewColumns(viewId: string): Promise<string[]> {
     const view = await this.client.get<{ layoutxml: string }>(
-      `api/data/v9.2/savedqueries(${viewId})?$select=layoutxml`,
+      `api/data/v9.2/savedqueries(${odataGuid(viewId, 'viewId')})?$select=layoutxml`,
     );
     return this.parseLayoutColumns(view.layoutxml ?? '');
   }
@@ -207,7 +208,7 @@ export class FormViewService {
    */
   async addViewColumn(viewId: string, attributeName: string, entityLogicalName: string, width: number = 150): Promise<{ added: boolean }> {
     const view = await this.client.get<{ layoutxml: string; fetchxml: string }>(
-      `api/data/v9.2/savedqueries(${viewId})?$select=layoutxml,fetchxml`,
+      `api/data/v9.2/savedqueries(${odataGuid(viewId, 'viewId')})?$select=layoutxml,fetchxml`,
     );
     let layoutxml = view.layoutxml ?? '';
     let fetchxml = view.fetchxml ?? '';
@@ -235,7 +236,7 @@ export class FormViewService {
       + `<attribute name="${attributeName}" />`
       + fetchxml.substring(entityCloseIdx);
 
-    await this.client.patch(`api/data/v9.2/savedqueries(${viewId})`, { layoutxml, fetchxml, returnedtypecode: entityLogicalName });
+    await this.client.patch(`api/data/v9.2/savedqueries(${odataGuid(viewId, 'viewId')})`, { layoutxml, fetchxml, returnedtypecode: entityLogicalName });
     await this.publishEntity(entityLogicalName);
 
     return { added: true };
@@ -250,7 +251,7 @@ export class FormViewService {
    */
   async removeViewColumn(viewId: string, attributeName: string, entityLogicalName: string): Promise<{ removed: boolean }> {
     const view = await this.client.get<{ layoutxml: string; fetchxml: string }>(
-      `api/data/v9.2/savedqueries(${viewId})?$select=layoutxml,fetchxml`,
+      `api/data/v9.2/savedqueries(${odataGuid(viewId, 'viewId')})?$select=layoutxml,fetchxml`,
     );
     let layoutxml = view.layoutxml ?? '';
     let fetchxml = view.fetchxml ?? '';
@@ -272,7 +273,7 @@ export class FormViewService {
       return { removed: false };
     }
 
-    await this.client.patch(`api/data/v9.2/savedqueries(${viewId})`, { layoutxml: newLayout, fetchxml: newFetch, returnedtypecode: entityLogicalName });
+    await this.client.patch(`api/data/v9.2/savedqueries(${odataGuid(viewId, 'viewId')})`, { layoutxml: newLayout, fetchxml: newFetch, returnedtypecode: entityLogicalName });
     await this.publishEntity(entityLogicalName);
 
     return { removed: true };
@@ -305,7 +306,7 @@ export class FormViewService {
 
     // Read current view to preserve the <grid> attributes (object, jump, etc.)
     const view = await this.client.get<{ layoutxml: string; fetchxml: string; querytype: number }>(
-      `api/data/v9.2/savedqueries(${viewId})?$select=layoutxml,fetchxml,querytype`,
+      `api/data/v9.2/savedqueries(${odataGuid(viewId, 'viewId')})?$select=layoutxml,fetchxml,querytype`,
     );
     if (findColumns?.length && view.querytype !== QUICK_FIND_QUERY_TYPE) {
       throw new Error(`--find-columns only applies to Quick Find views; view ${viewId} has querytype ${view.querytype}.`);
@@ -348,7 +349,7 @@ export class FormViewService {
 
     // returnedtypecode must travel with fetchxml: Quick Find views fail with a bare
     // "An unexpected error occurred" (0x80040216) when it is left out.
-    await this.client.patch(`api/data/v9.2/savedqueries(${viewId})`, { layoutxml, fetchxml, returnedtypecode: entityLogicalName });
+    await this.client.patch(`api/data/v9.2/savedqueries(${odataGuid(viewId, 'viewId')})`, { layoutxml, fetchxml, returnedtypecode: entityLogicalName });
     await this.publishEntity(entityLogicalName);
 
     return { columns: columns.map(c => c.name), findColumns };
@@ -382,7 +383,7 @@ export class FormViewService {
       throw new Error('At least one column is required.');
     }
     const meta = await this.client.get<{ ObjectTypeCode: number; PrimaryIdAttribute: string; PrimaryNameAttribute: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')?$select=ObjectTypeCode,PrimaryIdAttribute,PrimaryNameAttribute`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityLogicalName)})?$select=ObjectTypeCode,PrimaryIdAttribute,PrimaryNameAttribute`,
     );
 
     const state = options.state ?? 'active';
@@ -395,7 +396,7 @@ export class FormViewService {
     const layoutxml = buildViewLayoutXml(gridOpen, meta.PrimaryIdAttribute, columns);
 
     const existing = await this.client.get<ApiCollectionResponse<{ savedqueryid: string }>>(
-      `api/data/v9.2/savedqueries?$select=savedqueryid&$filter=returnedtypecode eq '${entityLogicalName}' and name eq '${name.replace(/'/g, "''")}'`,
+      `api/data/v9.2/savedqueries?$select=savedqueryid&$filter=returnedtypecode eq ${odataString(entityLogicalName)} and name eq ${odataString(name)}`,
     );
     const body = {
       name,
@@ -456,7 +457,7 @@ export class FormViewService {
     dryRun = false,
   ): Promise<FormLayoutResult & { formName: string; notOnForm: string[]; saved: boolean }> {
     const form = await this.client.get<{ formxml: string; objecttypecode: string; name: string }>(
-      `api/data/v9.2/systemforms(${formId})?$select=formxml,objecttypecode,name`,
+      `api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})?$select=formxml,objecttypecode,name`,
     );
     if (form.objecttypecode !== entityLogicalName) {
       throw new Error(`Form ${formId} belongs to '${form.objecttypecode}', not '${entityLogicalName}'.`);
@@ -471,7 +472,7 @@ export class FormViewService {
       IsValidForForm?: boolean;
       DisplayName?: { UserLocalizedLabel?: { Label: string } | null };
     }>>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes?$select=LogicalName,AttributeType,AttributeTypeName,AttributeOf,IsCustomAttribute,IsValidForForm,DisplayName`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityLogicalName)})/Attributes?$select=LogicalName,AttributeType,AttributeTypeName,AttributeOf,IsCustomAttribute,IsValidForForm,DisplayName`,
     );
     const formAttrs = (attrs.value ?? []).filter(a => a.IsValidForForm !== false && !a.AttributeOf);
     const attributes = new Map<string, FormAttributeInfo>(formAttrs.map(a => [a.LogicalName, {
@@ -491,7 +492,7 @@ export class FormViewService {
       .sort();
 
     if (!dryRun) {
-      await this.client.patch(`api/data/v9.2/systemforms(${formId})`, { formxml: result.formxml });
+      await this.client.patch(`api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})`, { formxml: result.formxml });
       await this.publishEntity(entityLogicalName);
     }
     return { ...result, formName: form.name, notOnForm, saved: !dryRun };

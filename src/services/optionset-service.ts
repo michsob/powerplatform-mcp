@@ -1,4 +1,5 @@
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { odataString } from '../odata.js';
 
 /**
  * Service for option set operations.
@@ -13,6 +14,6 @@ export class OptionSetService {
    * @returns The global option set definition
    */
   async getGlobalOptionSet(optionSetName: string): Promise<any> {
-    return this.client.get(`api/data/v9.2/GlobalOptionSetDefinitions(Name='${optionSetName}')`);
+    return this.client.get(`api/data/v9.2/GlobalOptionSetDefinitions(Name=${odataString(optionSetName)})`);
   }
 }

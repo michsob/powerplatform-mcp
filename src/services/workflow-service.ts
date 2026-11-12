@@ -5,6 +5,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { odataGuid, odataInteger } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 export interface OotbWorkflowEntry {
@@ -115,7 +116,7 @@ export class WorkflowService {
 
     let categoryFilter: string;
     if (categories?.length) {
-      categoryFilter = categories.map((c) => `category eq ${c}`).join(' or ');
+      categoryFilter = categories.map((c) => `category eq ${odataInteger(c, 'category')}`).join(' or ');
       categoryFilter = `(${categoryFilter})`;
     } else {
       categoryFilter = 'category ne 5';
@@ -163,7 +164,7 @@ export class WorkflowService {
     summary: boolean = false
   ): Promise<unknown> {
     const workflow = await this.client.get<Record<string, unknown>>(
-      `api/data/v9.2/workflows(${workflowId})?$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,category,ismanaged,iscrmuiworkflow,primaryentity,mode,subprocess,ondemand,triggeroncreate,triggerondelete,triggeronupdateattributelist,syncworkflowlogonfailure,xaml,_ownerid_value&$expand=modifiedby($select=fullname),createdby($select=fullname)`
+      `api/data/v9.2/workflows(${odataGuid(workflowId, 'workflowId')})?$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,category,ismanaged,iscrmuiworkflow,primaryentity,mode,subprocess,ondemand,triggeroncreate,triggerondelete,triggeronupdateattributelist,syncworkflowlogonfailure,xaml,_ownerid_value&$expand=modifiedby($select=fullname),createdby($select=fullname)`
     );
 
     const baseResult = {

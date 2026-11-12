@@ -5,6 +5,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { odataGuid } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 // `ownerid` is a polymorphic lookup to `principal` (a systemuser *or* a team),
@@ -79,7 +80,7 @@ export class BusinessRuleService {
    */
   async getBusinessRule(workflowId: string): Promise<unknown> {
     const businessRule = await this.client.get<Record<string, unknown>>(
-      `api/data/v9.2/workflows(${workflowId})?$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,category,ismanaged,primaryentity,xaml,_ownerid_value&$expand=modifiedby($select=fullname),createdby($select=fullname)`,
+      `api/data/v9.2/workflows(${odataGuid(workflowId, 'workflowId')})?$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,category,ismanaged,primaryentity,xaml,_ownerid_value&$expand=modifiedby($select=fullname),createdby($select=fullname)`,
       FORMATTED_VALUES
     );
 

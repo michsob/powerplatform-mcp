@@ -5,7 +5,8 @@
  */
 
 import axios from 'axios';
-import { PowerPlatformClient } from '../powerplatform-client.js';
+import { DataverseRequestError, PowerPlatformClient, REQUEST_TIMEOUT_MS } from '../powerplatform-client.js';
+import { isGuid, odataDateTime, odataGuid, odataInteger, odataString } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 import { applyFlowFilters, type FlowFilterConfig } from './flow-filter.js';
 
@@ -292,8 +293,7 @@ export class FlowService {
     }
 
     if (nameContains) {
-      const escapedName = nameContains.replace(/'/g, "''");
-      filterConditions.push(`contains(name,'${escapedName}')`);
+      filterConditions.push(`contains(name,${odataString(nameContains)})`);
     }
 
     const filterString = filterConditions.join(' and ');
@@ -415,25 +415,23 @@ export class FlowService {
     const filterConditions: string[] = [];
 
     if (name) {
-      const escapedName = name.replace(/'/g, "''");
-      filterConditions.push(`contains(name,'${escapedName}')`);
+      filterConditions.push(`contains(name,${odataString(name)})`);
     }
 
     if (primaryEntity) {
-      filterConditions.push(`primaryentity eq '${primaryEntity}'`);
+      filterConditions.push(`primaryentity eq ${odataString(primaryEntity)}`);
     }
 
     if (description) {
-      const escapedDescription = description.replace(/'/g, "''");
-      filterConditions.push(`contains(description,'${escapedDescription}')`);
+      filterConditions.push(`contains(description,${odataString(description)})`);
     }
 
     if (category !== undefined) {
-      filterConditions.push(`category eq ${category}`);
+      filterConditions.push(`category eq ${odataInteger(category, 'category')}`);
     }
 
     if (statecode !== undefined) {
-      filterConditions.push(`statecode eq ${statecode}`);
+      filterConditions.push(`statecode eq ${odataInteger(statecode, 'statecode')}`);
     }
 
     const filterString =
@@ -508,7 +506,7 @@ export class FlowService {
     summary: boolean = false
   ): Promise<unknown> {
     const flow = await this.client.get<Record<string, unknown>>(
-      `api/data/v9.2/workflows(${flowId})?$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,category,ismanaged,iscrmuiworkflow,primaryentity,clientdata&$expand=modifiedby($select=fullname),createdby($select=fullname)`
+      `api/data/v9.2/workflows(${odataGuid(flowId, 'flowId')})?$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,category,ismanaged,iscrmuiworkflow,primaryentity,clientdata&$expand=modifiedby($select=fullname),createdby($select=fullname)`
     );
 
     let flowDefinition = null;
@@ -853,18 +851,18 @@ export class FlowService {
     const limit = Math.min(maxRecords, 250);
 
     try {
-      const filterConditions: string[] = [`_workflow_value eq '${flowId}'`];
+      const filterConditions: string[] = [`_workflow_value eq ${odataGuid(flowId, 'flowId')}`];
 
       if (status) {
-        filterConditions.push(`status eq '${status}'`);
+        filterConditions.push(`status eq ${odataString(status)}`);
       }
 
       if (startedAfter) {
-        filterConditions.push(`starttime ge ${startedAfter}`);
+        filterConditions.push(`starttime ge ${odataDateTime(startedAfter, 'startedAfter')}`);
       }
 
       if (startedBefore) {
-        filterConditions.push(`starttime le ${startedBefore}`);
+        filterConditions.push(`starttime le ${odataDateTime(startedBefore, 'startedBefore')}`);
       }
 
       const filterString = filterConditions.join(' and ');
@@ -919,27 +917,13 @@ export class FlowService {
         runs: formattedRuns,
       };
     } catch (error: unknown) {
-      const err = error as {
-        response?: {
-          status?: number;
-          statusText?: string;
-          data?: { error?: { code?: string; message?: string } };
-        };
-        message?: string;
-      };
-
-      const apiError = err.response?.data?.error;
-      if (err.response?.status === 404) {
+      if (error instanceof DataverseRequestError && error.status === 404) {
         throw new Error(`Flow runs not found for flow: ${flowId}. Verify the flow ID is correct.`);
       }
-      if (err.response?.status === 403) {
+      if (error instanceof DataverseRequestError && error.status === 403) {
         throw new Error(`Access denied to flowruns table. Ensure the service principal has read access to the flowruns Elastic table.`);
       }
-
-      const errorDetails = apiError || err.response?.data || err.message;
-      throw new Error(
-        `Failed to get flow runs: ${err.message} - ${JSON.stringify(errorDetails)}`
-      );
+      throw new Error(`Failed to get flow runs: ${(error as Error).message}`);
     }
   }
 
@@ -950,14 +934,13 @@ export class FlowService {
   async getFlowRunDetails(flowId: string, runId: string): Promise<unknown> {
     try {
       const environmentId = await this.getEnvironmentId();
-      const token = await this.client.getManagementToken();
 
       // If runId looks like a GUID, try to get the name from Dataverse flowruns table
       let flowApiRunId = runId;
-      if (runId.includes('-') && runId.length === 36) {
+      if (isGuid(runId)) {
         try {
           const response = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-            `api/data/v9.2/flowruns?$filter=flowrunid eq ${runId}&$select=name`
+            `api/data/v9.2/flowruns?$filter=flowrunid eq ${odataGuid(runId, 'runId')}&$select=name`
           );
           if (response.value && response.value.length > 0) {
             flowApiRunId = (response.value[0].name as string) || runId;
@@ -967,18 +950,10 @@ export class FlowService {
         }
       }
 
-      const url = `https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/${environmentId}/flows/${flowId}/runs/${flowApiRunId}?$expand=properties/actions&api-version=2016-11-01`;
-
-      const response = await axios({
-        method: 'GET',
-        url,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-
-      const runData = response.data;
+      const runData = await this.client.flowApi<Record<string, any>>(
+        'GET',
+        `${flowsPath(environmentId, flowId)}/runs/${encodeURIComponent(flowApiRunId)}?$expand=properties/actions&api-version=2016-11-01`,
+      );
       const properties = runData.properties || {};
 
       const result: Record<string, unknown> = {
@@ -1034,7 +1009,8 @@ export class FlowService {
 
           if (actionStatus === 'failed' && outputsLink) {
             try {
-              const outputResponse = await axios.get(outputsLink);
+              // A pre-signed URL: no bearer token, but the same timeout.
+              const outputResponse = await axios.get(outputsLink, { timeout: REQUEST_TIMEOUT_MS });
               const outputData = outputResponse.data;
               if (outputData?.body?.error) {
                 actionResult.error = outputData.body.error;
@@ -1066,19 +1042,7 @@ export class FlowService {
 
       return result;
     } catch (error: unknown) {
-      const err = error as {
-        response?: {
-          status?: number;
-          statusText?: string;
-          data?: { error?: unknown };
-        };
-        message?: string;
-      };
-      const errorDetails =
-        err.response?.data?.error || err.response?.data || err.message;
-      throw new Error(
-        `Failed to get flow run details: ${err.message} - ${JSON.stringify(errorDetails)}`
-      );
+      throw new Error(`Failed to get flow run details: ${(error as Error).message}`);
     }
   }
 
@@ -1088,7 +1052,6 @@ export class FlowService {
   async cancelFlowRun(flowId: string, runId: string): Promise<CancelFlowRunResult> {
     try {
       const environmentId = await this.getEnvironmentId();
-      const token = await this.client.getManagementToken();
 
       const runDetails = await this.getFlowRunDetails(flowId, runId) as Record<string, unknown>;
       const status = (runDetails.status as string) || '';
@@ -1098,14 +1061,10 @@ export class FlowService {
         throw new Error(`Cannot cancel flow run - already in terminal state: ${status}`);
       }
 
-      const url = `https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/${environmentId}/flows/${flowId}/runs/${runId}/cancel?api-version=2016-11-01`;
-
-      await axios.post(url, {}, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
+      await this.client.flowApi(
+        'POST',
+        `${flowsPath(environmentId, flowId)}/runs/${encodeURIComponent(runId)}/cancel?api-version=2016-11-01`,
+      );
 
       return {
         success: true,
@@ -1114,18 +1073,7 @@ export class FlowService {
         previousStatus: status,
       };
     } catch (error: unknown) {
-      const err = error as {
-        response?: {
-          status?: number;
-          statusText?: string;
-          data?: { error?: unknown };
-        };
-        message?: string;
-      };
-      const errorDetails = err.response?.data?.error || err.response?.data || err.message;
-      throw new Error(
-        `Failed to cancel flow run: ${err.message} - ${JSON.stringify(errorDetails)}`
-      );
+      throw new Error(`Failed to cancel flow run: ${(error as Error).message}`);
     }
   }
 
@@ -1135,7 +1083,6 @@ export class FlowService {
   async resubmitFlowRun(flowId: string, runId: string): Promise<ResubmitFlowRunResult> {
     try {
       const environmentId = await this.getEnvironmentId();
-      const token = await this.client.getManagementToken();
 
       const flowDef = await this.getFlowDefinition(flowId, false) as Record<string, unknown>;
       const flowDefinition = flowDef.flowDefinition as Record<string, unknown> | null;
@@ -1144,35 +1091,20 @@ export class FlowService {
       const triggers = definition?.triggers as Record<string, unknown> | undefined;
       const triggerName = triggers ? Object.keys(triggers)[0] : 'manual';
 
-      const url = `https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/${environmentId}/flows/${flowId}/triggers/${triggerName}/histories/${runId}/resubmit?api-version=2016-11-01`;
-
-      const response = await axios.post(url, {}, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
+      const response = await this.client.flowApi<Record<string, unknown>>(
+        'POST',
+        `${flowsPath(environmentId, flowId)}/triggers/${encodeURIComponent(triggerName)}/histories/${encodeURIComponent(runId)}/resubmit?api-version=2016-11-01`,
+      );
 
       return {
         success: true,
         flowId,
         originalRunId: runId,
-        newRunId: (response.data as Record<string, unknown>)?.name as string || 'pending',
+        newRunId: (response?.name as string) || 'pending',
         triggerName,
       };
     } catch (error: unknown) {
-      const err = error as {
-        response?: {
-          status?: number;
-          statusText?: string;
-          data?: { error?: unknown };
-        };
-        message?: string;
-      };
-      const errorDetails = err.response?.data?.error || err.response?.data || err.message;
-      throw new Error(
-        `Failed to resubmit flow run: ${err.message} - ${JSON.stringify(errorDetails)}`
-      );
+      throw new Error(`Failed to resubmit flow run: ${(error as Error).message}`);
     }
   }
 
@@ -1239,7 +1171,7 @@ export class FlowService {
     let previousState: 'Draft' | 'Activated' | 'Unknown' = 'Unknown';
     try {
       const current = await this.client.get<{ statecode: number }>(
-        `api/data/v9.2/workflows(${flowId})?$select=statecode`
+        `api/data/v9.2/workflows(${odataGuid(flowId, 'flowId')})?$select=statecode`
       );
       previousState = current.statecode === 1 ? 'Activated' : 'Draft';
     } catch {
@@ -1252,7 +1184,7 @@ export class FlowService {
       : { statecode: 0, statuscode: 1 };
 
     try {
-      await this.client.patch(`api/data/v9.2/workflows(${flowId})`, body);
+      await this.client.patch(`api/data/v9.2/workflows(${odataGuid(flowId, 'flowId')})`, body);
     } catch (error: unknown) {
       const detail = (error as { message?: string })?.message ?? String(error);
       if (/ConnectionAuthorizationFailed/i.test(detail)) {
@@ -1503,4 +1435,9 @@ export class FlowService {
     this.environmentId = orgResponse.value[0].organizationid;
     return this.environmentId;
   }
+}
+
+/** The Flow API path of a flow, with each segment encoded. */
+function flowsPath(environmentId: string, flowId: string): string {
+  return `providers/Microsoft.ProcessSimple/environments/${encodeURIComponent(environmentId)}/flows/${encodeURIComponent(flowId)}`;
 }

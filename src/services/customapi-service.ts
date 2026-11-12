@@ -6,6 +6,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { odataGuid, odataString } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 export class CustomApiService {
@@ -72,7 +73,7 @@ export class CustomApiService {
     ].join(',');
 
     const response = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/customapis?$filter=uniquename eq '${uniqueName}'&$select=${select}&$top=1`
+      `api/data/v9.2/customapis?$filter=uniquename eq ${odataString(uniqueName)}&$select=${select}&$top=1`
     );
 
     return response.value.length > 0 ? response.value[0] : null;
@@ -123,7 +124,7 @@ export class CustomApiService {
     }
 
     if (options.pluginTypeId !== undefined) {
-      body['PluginTypeId@odata.bind'] = `/plugintypes(${options.pluginTypeId})`;
+      body['PluginTypeId@odata.bind'] = `/plugintypes(${odataGuid(options.pluginTypeId, 'pluginTypeId')})`;
     }
 
     const headers = options.solutionName ? { 'MSCRM.SolutionUniqueName': options.solutionName } : undefined;
@@ -154,7 +155,7 @@ export class CustomApiService {
     ].join(',');
 
     return this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/customapiresponseproperties?$filter=_customapiid_value eq ${customApiId}&$select=${select}`
+      `api/data/v9.2/customapiresponseproperties?$filter=_customapiid_value eq ${odataGuid(customApiId, 'customApiId')}&$select=${select}`
     );
   }
 
@@ -185,7 +186,7 @@ export class CustomApiService {
       name: options.name,
       displayname: options.displayName,
       type: options.type,
-      'CustomAPIId@odata.bind': `/customapis(${options.customApiId})`,
+      'CustomAPIId@odata.bind': `/customapis(${odataGuid(options.customApiId, 'customApiId')})`,
     };
 
     if (options.description !== undefined) {
@@ -224,7 +225,7 @@ export class CustomApiService {
     ].join(',');
 
     return this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/customapirequestparameters?$filter=_customapiid_value eq ${customApiId}&$select=${select}`
+      `api/data/v9.2/customapirequestparameters?$filter=_customapiid_value eq ${odataGuid(customApiId, 'customApiId')}&$select=${select}`
     );
   }
 
@@ -256,7 +257,7 @@ export class CustomApiService {
       displayname: options.displayName,
       type: options.type,
       isoptional: options.isOptional ?? false,
-      'CustomAPIId@odata.bind': `/customapis(${options.customApiId})`,
+      'CustomAPIId@odata.bind': `/customapis(${odataGuid(options.customApiId, 'customApiId')})`,
     };
 
     if (options.description !== undefined) {

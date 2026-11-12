@@ -1,4 +1,5 @@
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { expectAll, odataGuid, odataInteger, odataString } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 /**
@@ -36,10 +37,10 @@ export class WebResourceService {
 
     const filters: string[] = [];
     if (options?.webResourceType !== undefined) {
-      filters.push(`webresourcetype eq ${options.webResourceType}`);
+      filters.push(`webresourcetype eq ${odataInteger(options.webResourceType, 'webResourceType')}`);
     }
     if (options?.nameFilter) {
-      filters.push(`contains(name,'${options.nameFilter}')`);
+      filters.push(`contains(name,${odataString(options.nameFilter)})`);
     }
 
     let url = `api/data/v9.2/webresourceset?$select=${selectProperties}&$orderby=name&$top=${maxRecords}`;
@@ -57,9 +58,12 @@ export class WebResourceService {
    */
   async getWebResource(name: string): Promise<Record<string, unknown> | null> {
     const result = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/webresourceset?$filter=name eq '${name}'&$top=1`
+      `api/data/v9.2/webresourceset?$filter=name eq ${odataString(name)}&$top=1`
     );
-    return result.value && result.value.length > 0 ? result.value[0] : null;
+    // upsertWebResource overwrites what this returns, so a row that is not the one asked for
+    // (a filter that did not apply) must never come back from here.
+    const rows = expectAll(result.value ?? [], (r) => String(r.name).toLowerCase() === name.toLowerCase(), `name eq '${name}'`);
+    return rows[0] ?? null;
   }
 
   /**
@@ -102,7 +106,7 @@ export class WebResourceService {
   async updateWebResource(webResourceId: string, content: string, solutionName?: string): Promise<void> {
     const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
     await this.client.patch(
-      `api/data/v9.2/webresourceset(${webResourceId})`,
+      `api/data/v9.2/webresourceset(${odataGuid(webResourceId, 'webResourceId')})`,
       { content },
       headers,
     );

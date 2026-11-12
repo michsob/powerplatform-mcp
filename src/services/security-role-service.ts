@@ -6,6 +6,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { odataGuid, odataString } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 import type { SolutionService } from './solution-service.js';
 
@@ -149,7 +150,7 @@ export class SecurityRoleService {
     roleId: string
   ): Promise<Array<{ privilegeid: string; privilegedepthmask: number }>> {
     const result = await this.client.get<ApiCollectionResponse<{ privilegeid: string; privilegedepthmask: number }>>(
-      `api/data/v9.2/roleprivilegescollection?$filter=roleid eq ${roleId}&$select=privilegeid,privilegedepthmask`,
+      `api/data/v9.2/roleprivilegescollection?$filter=roleid eq ${odataGuid(roleId, 'roleId')}&$select=privilegeid,privilegedepthmask`,
     );
     return result.value;
   }
@@ -235,7 +236,7 @@ export class SecurityRoleService {
     const select = 'privilegeid,name,accessright,canbebasic,canbelocal,canbedeep,canbeglobal,canbeentityreference,canbeparententityreference';
     const filterParts: string[] = [];
     if (entityFilter) {
-      filterParts.push(`contains(name,'${entityFilter.replace(/'/g, "''")}')`);
+      filterParts.push(`contains(name,${odataString(entityFilter)})`);
     }
     if (accessRightFilter) {
       filterParts.push(`startswith(name,'prv${accessRightFilter.replace(/'/g, "''")}')`);
@@ -266,7 +267,7 @@ export class SecurityRoleService {
 
     const body: Record<string, unknown> = {
       name: options.name,
-      'businessunitid@odata.bind': `/businessunits(${businessUnitId})`,
+      'businessunitid@odata.bind': `/businessunits(${odataGuid(businessUnitId, 'businessUnitId')})`,
     };
     if (options.description !== undefined) {
       body.description = options.description;
@@ -296,7 +297,7 @@ export class SecurityRoleService {
     if (patch.name !== undefined) body.name = patch.name;
     if (patch.description !== undefined) body.description = patch.description;
     if (patch.businessUnitId !== undefined) {
-      body['businessunitid@odata.bind'] = `/businessunits(${patch.businessUnitId})`;
+      body['businessunitid@odata.bind'] = `/businessunits(${odataGuid(patch.businessUnitId, 'businessUnitId')})`;
     }
 
     if (Object.keys(body).length === 0) {
@@ -307,14 +308,14 @@ export class SecurityRoleService {
       ? { 'MSCRM.SolutionUniqueName': patch.solutionUniqueName }
       : undefined;
 
-    await this.client.patch(`api/data/v9.2/roles(${roleId})`, body, headers);
+    await this.client.patch(`api/data/v9.2/roles(${odataGuid(roleId, 'roleId')})`, body, headers);
   }
 
   /**
    * Delete a security role.
    */
   async deleteSecurityRole(roleId: string): Promise<void> {
-    await this.client.delete(`api/data/v9.2/roles(${roleId})`);
+    await this.client.delete(`api/data/v9.2/roles(${odataGuid(roleId, 'roleId')})`);
   }
 
   /**
@@ -335,7 +336,7 @@ export class SecurityRoleService {
         : undefined;
 
       const result = await this.client.post<{ RoleId?: string; entityId?: string }>(
-        `api/data/v9.2/roles(${sourceRoleId})/Microsoft.Dynamics.CRM.CloneAsRole`,
+        `api/data/v9.2/roles(${odataGuid(sourceRoleId, 'sourceRoleId')})/Microsoft.Dynamics.CRM.CloneAsRole`,
         { TargetBusinessUnitId: targetBusinessUnitId },
         headers,
       );
@@ -353,7 +354,7 @@ export class SecurityRoleService {
     } catch (cloneError: any) {
       // Fallback: create a fresh role and copy privileges from the source.
       const sourceRole = await this.client.get<Record<string, unknown>>(
-        `api/data/v9.2/roles(${sourceRoleId})?$select=name`,
+        `api/data/v9.2/roles(${odataGuid(sourceRoleId, 'sourceRoleId')})?$select=name`,
       );
       const fallbackName = options.newName ?? `${sourceRole.name} (copy)`;
 
@@ -389,7 +390,7 @@ export class SecurityRoleService {
     };
 
     await this.client.post(
-      `api/data/v9.2/roles(${roleId})/Microsoft.Dynamics.CRM.AddPrivilegesRole`,
+      `api/data/v9.2/roles(${odataGuid(roleId, 'roleId')})/Microsoft.Dynamics.CRM.AddPrivilegesRole`,
       body,
     );
   }
@@ -403,7 +404,7 @@ export class SecurityRoleService {
     };
 
     await this.client.post(
-      `api/data/v9.2/roles(${roleId})/Microsoft.Dynamics.CRM.ReplacePrivilegesRole`,
+      `api/data/v9.2/roles(${odataGuid(roleId, 'roleId')})/Microsoft.Dynamics.CRM.ReplacePrivilegesRole`,
       body,
     );
   }
@@ -417,9 +418,12 @@ export class SecurityRoleService {
       throw new Error('removeRolePrivileges requires at least one privilegeId');
     }
 
-    for (const privilegeId of privilegeIds) {
+    // Validate every id before the first call, so a bad one cannot leave the role half-changed.
+    const role = odataGuid(roleId, 'roleId');
+    const ids = privilegeIds.map((id) => odataGuid(id, 'privilegeId'));
+    for (const privilegeId of ids) {
       await this.client.post(
-        `api/data/v9.2/roles(${roleId})/Microsoft.Dynamics.CRM.RemovePrivilegeRole`,
+        `api/data/v9.2/roles(${role})/Microsoft.Dynamics.CRM.RemovePrivilegeRole`,
         { PrivilegeId: privilegeId },
       );
     }
@@ -427,11 +431,11 @@ export class SecurityRoleService {
 
   private toApiPrivilege(p: PrivilegeAssignment): Record<string, unknown> {
     const body: Record<string, unknown> = {
-      PrivilegeId: p.privilegeId,
+      PrivilegeId: odataGuid(p.privilegeId, 'privilegeId'),
       Depth: p.depth,
     };
     if (p.businessUnitId) {
-      body.BusinessUnitId = p.businessUnitId;
+      body.BusinessUnitId = odataGuid(p.businessUnitId, 'businessUnitId');
     }
     return body;
   }
