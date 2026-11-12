@@ -65,7 +65,7 @@ For local development, copy `.env.example` to `.env` and fill in your credential
 
 The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilot).
 
-### Available MCP Tools (67)
+### Available MCP Tools (66)
 
 All tools accept an optional `environment` parameter to target a specific environment (defaults to the first configured).
 
@@ -271,7 +271,7 @@ entity-pipeline <entityName>               [--message <msg>] [--include-disabled
 plugin-trace-logs                          [--entity <name>] [--message <msg>] [--correlation-id <id>] [--step-id <id>] [--hours <n>] [--max <n>] [--exceptions-only]
 all-plugin-steps                           [--include-disabled] [--max <n>]
 sdk-message <messageName>
-register-plugin-package <filePath>         [--pkg-version <version>] [--solution <name>]
+register-plugin-package <filePath>         --name <name> --unique-name <uniqueName> [--pkg-version <version>] [--solution <name>]
 update-plugin-package <filePath>           --plugin-package-id <id> [--pkg-version <version>]
 create-plugin-step <name> <pluginTypeId> <sdkMessageId>  [--stage <n>] [--mode <n>] [--rank <n>] [--supported-deployment <n>] [--description <desc>] [--configuration <cfg>] [--message-filter-id <id>] [--solution <name>]
 create-plugin-step-image <stepId>          [--name <name>] [--entity-alias <alias>] [--image-type <0|1|2>] [--message-property-name <name>] [--attributes <csv>]
@@ -286,7 +286,7 @@ flow-runs <flowId>                         [--status <s>] [--after <iso>] [--bef
 flow-run-details <flowId> <runId>
 flow-health                                [--days <n>] [--max-runs <n>] [--max-flows <n>] [--active]
 search-workflows                           [--name <name>] [--entity <entity>] [--category <n>] [--active] [--max <n>]
-create-cloud-flow <clientDataFile>         [--primary-entity <entity>] [--solution <name>]
+create-cloud-flow <clientDataFile>         --name <name> [--primary-entity <entity>] [--solution <name>]
 activate-flow <flowId>
 deactivate-flow <flowId>
 ```
@@ -305,7 +305,7 @@ publish-customizations                     [--entity <logicalName>]
 ```
 workflows                                  [--active] [--max <n>]
 workflow-definition <workflowId>           [--summary]
-ootb-workflows                             [--categories <0,1,2,3,4>]
+ootb-workflows                             [--categories <0,1,2,3,4>] [--max <n>]
 ```
 
 #### Business Rules
@@ -341,9 +341,9 @@ custom-apis                                [--include-managed] [--max <n>]
 custom-api <uniqueName>
 create-custom-api <uniqueName> <displayName>  [--binding-type <n>] [--bound-entity <name>] [--is-function] [--is-private] [--processing-type <n>] [--plugin-type-id <id>] [--plugin-type-name <name>] [--description <desc>] [--solution <name>]
 custom-api-response-properties <customApiId>
-create-custom-api-response-property <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--solution <name>]
+create-custom-api-response-property <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--logical-entity <name>] [--solution <name>]
 custom-api-request-parameters <customApiId>
-create-custom-api-request-parameter <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--optional] [--solution <name>]
+create-custom-api-request-parameter <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--logical-entity <name>] [--optional] [--solution <name>]
 ```
 
 #### Web Resources
@@ -454,13 +454,15 @@ npm run inspector      # test with MCP Inspector
 
 To publish a new version:
 
-1. Update `version` in `package.json`
-2. Commit the change to `main`
-3. Create and push a version tag:
+1. Update `version` in `package.json` and `package.cli.json` (the CLI is published with the version from `package.json`; keep the two in step)
+2. Merge the change to `main`
+3. Tag that commit on `main` with the same version and push the tag:
    ```bash
-   git tag v1.0.2
-   git push origin v1.0.2
+   VERSION=v$(node -p "require('./package.json').version")
+   git tag "$VERSION"
+   git push origin "$VERSION"
    ```
+   The publish workflow refuses a tag that is not on `main` or does not match `package.json`.
 
 GitHub Actions will automatically publish:
 
