@@ -6,7 +6,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
-import { odataGuid } from '../odata.js';
+import { fetchCapped, odataGuid, type Truncation } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 import { ENVIRONMENT_VARIABLE_TYPES } from './environment-variable-masking.js';
 
@@ -39,7 +39,7 @@ export class ConfigurationService {
    */
   async getConnectionReferences(
     options: ConnectionReferenceOptions = {}
-  ): Promise<ApiCollectionResponse<Record<string, unknown>>> {
+  ): Promise<ApiCollectionResponse<Record<string, unknown>> & Truncation> {
     const { maxRecords = 100, managedOnly = false, hasConnection, inactive } = options;
 
     const filterConditions: string[] = [];
@@ -71,14 +71,14 @@ export class ConfigurationService {
     let endpoint =
       `api/data/v9.2/connectionreferences` +
       `?$select=${select}` +
-      `&$orderby=connectionreferencelogicalname` +
-      `&$top=${maxRecords}`;
+      `&$orderby=connectionreferencelogicalname`;
 
     if (filterConditions.length > 0) {
       endpoint += `&$filter=${filterConditions.join(' and ')}`;
     }
 
-    return this.client.get<ApiCollectionResponse<Record<string, unknown>>>(endpoint);
+    const { rows, ...truncation } = await fetchCapped<Record<string, unknown>>(this.client, endpoint, maxRecords);
+    return { value: rows, ...truncation };
   }
 
   /**
@@ -98,7 +98,7 @@ export class ConfigurationService {
    */
   async getEnvironmentVariables(
     options: EnvironmentVariableOptions = {}
-  ): Promise<ApiCollectionResponse<Record<string, unknown>>> {
+  ): Promise<ApiCollectionResponse<Record<string, unknown>> & Truncation> {
     const { maxRecords = 100, managedOnly = false } = options;
 
     const filterConditions: string[] = [];
@@ -120,14 +120,14 @@ export class ConfigurationService {
     let defsEndpoint =
       `api/data/v9.2/environmentvariabledefinitions` +
       `?$select=${select}` +
-      `&$orderby=schemaname` +
-      `&$top=${maxRecords}`;
+      `&$orderby=schemaname`;
 
     if (filterConditions.length > 0) {
       defsEndpoint += `&$filter=${filterConditions.join(' and ')}`;
     }
 
-    const defs = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(defsEndpoint);
+    const { rows: defRows, ...truncation } = await fetchCapped<Record<string, unknown>>(this.client, defsEndpoint, maxRecords);
+    const defs = { value: defRows, ...truncation };
 
     // A definition has at most one value record, so each chunk's answer fits in one page.
     const defIds = defs.value.map((d) => String(d.environmentvariabledefinitionid));

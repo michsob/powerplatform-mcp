@@ -11,19 +11,20 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
     "get-publishers",
     {
       title: "Get Publishers",
-      description: "Get all non-readonly publishers in the PowerPlatform environment",
+      description: "Get the publishers in the PowerPlatform environment, each with isreadonly. Includes read-only publishers that came with managed solutions unless writableOnly is set.",
       inputSchema: {
+        writableOnly: z.boolean().optional().describe("Only publishers that are not read-only, i.e. ones you can create components under (default: false)"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         publishers: z.any(),
       }),
     },
-    async ({ environment }) => {
+    async ({ writableOnly, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getSolutionService();
-        const result = await service.getPublishers();
+        const result = await service.getPublishers({ writableOnly });
 
         return {
           structuredContent: { publishers: result.value },

@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { truncationContent } from "./truncation.js";
 
 /**
  * Register service endpoint tools with the MCP server.
@@ -26,6 +27,7 @@ export function registerServiceEndpointTools(server: McpServer, registry: Enviro
         return {
           structuredContent: result,
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.totalCount} service endpoints:\n\n${JSON.stringify(result.endpoints, null, 2)}`,

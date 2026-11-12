@@ -6,7 +6,7 @@
 
 import axios from 'axios';
 import { DataverseRequestError, PowerPlatformClient, REQUEST_TIMEOUT_MS } from '../powerplatform-client.js';
-import { isGuid, odataDateTime, odataGuid, odataInteger, odataString } from '../odata.js';
+import { fetchCapped, isGuid, MAX_TOP, odataDateTime, odataGuid, odataInteger, odataString, pages, positiveCap } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 import { applyFlowFilters, type FlowFilterConfig } from './flow-filter.js';
 
@@ -40,6 +40,7 @@ export interface FlowListResult {
   totalCount: number;
   hasMore: boolean;
   requestedMax: number;
+  /** Flows excluded among those read. When `hasMore` is true, rows after the cap were not read. */
   excluded: {
     customerInsights: number;
     system: number;
@@ -121,6 +122,7 @@ export interface FlowRunsResult {
   environmentId: string;
   totalCount: number;
   hasMore: boolean;
+  requestedMax: number;
   filterApplied: {
     status?: string;
     startedAfter?: string;
@@ -142,11 +144,16 @@ export interface FlowHealthEntry {
   failedRuns: number;
   cancelledRuns: number;
   runningRuns: number;
+  /** Percentage of `totalRuns` that succeeded. When `moreRunsExist`, of the latest runs only. */
   successRate: number;
+  /** True when the window held more runs than `maxRunsPerFlow`: the counts cover the latest ones. */
+  moreRunsExist: boolean;
   lastRunTime: string | null;
   lastFailureTime: string | null;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
+  /** Why this flow's runs could not be read, or null. Such a flow is not counted as having no runs. */
+  scanError: string | null;
 }
 
 export interface FlowHealthScanResult {
@@ -159,6 +166,14 @@ export interface FlowHealthScanResult {
     flowsWithFailures: number;
     flowsHealthy: number;
     flowsNoRuns: number;
+    /** Flows whose runs could not be read (see each entry's `scanError`). */
+    flowsWithScanErrors: number;
+    /** Flows with more runs in the window than `maxRunsPerFlow`; their rates cover the latest runs only. */
+    flowsWithMoreRuns: number;
+    maxRunsPerFlow: number;
+    /** True when more flows matched than `maxFlows`: those were not scanned. */
+    moreFlowsExist: boolean;
+    maxFlows: number;
     totalRunsAnalyzed: number;
     totalFailures: number;
     overallSuccessRate: number;
@@ -288,54 +303,43 @@ export class FlowService {
       filterConditions.push('statecode eq 1');
     }
 
-    if (excludeCustomerInsights) {
-      filterConditions.push("not startswith(name,'CXP_')");
-    }
-
     if (nameContains) {
       filterConditions.push(`contains(name,${odataString(nameContains)})`);
     }
 
     const filterString = filterConditions.join(' and ');
 
-    const clientFilterFactor = excludeSystem || excludeCopilotSales ? 1.5 : 1;
-    const requestLimit = Math.ceil(maxRecords * clientFilterFactor) + 1;
-
-    const flows = await this.client.get<
-      ApiCollectionResponse<Record<string, unknown>>
-    >(
-      `api/data/v9.2/workflows?$filter=${filterString}&$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,ismanaged,iscrmuiworkflow,primaryentity,_ownerid_value&$expand=modifiedby($select=fullname)&$orderby=modifiedon desc&$top=${requestLimit}`
-    );
-
+    // The exclusions run here, not in the query, so each can be counted. Pages are read until
+    // one more flow than the cap has passed them: a fixed over-fetch could run out of rows and
+    // report "no more" while matching flows were still unread.
+    const cap = positiveCap(maxRecords);
     const excludedCounts = {
       customerInsights: 0,
       system: 0,
       copilotSales: 0,
     };
+    const included: Record<string, unknown>[] = [];
+    const endpoint =
+      `api/data/v9.2/workflows?$filter=${filterString}&$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,ismanaged,iscrmuiworkflow,primaryentity,_ownerid_value&$expand=modifiedby($select=fullname)&$orderby=modifiedon desc`;
 
-    let filteredFlows = flows.value;
-
-    if (excludeSystem) {
-      const beforeCount = filteredFlows.length;
-      filteredFlows = filteredFlows.filter((flow) => {
-        const modifiedBy = (flow.modifiedby as { fullname?: string })?.fullname;
-        return modifiedBy !== 'SYSTEM';
-      });
-      excludedCounts.system = beforeCount - filteredFlows.length;
+    for await (const page of pages<Record<string, unknown>>(this.client, endpoint, { pageSize: Math.min(MAX_TOP, Math.max(100, cap + 1)) })) {
+      for (const flow of page.rows) {
+        const name = String(flow.name ?? '');
+        if (excludeCustomerInsights && name.toUpperCase().startsWith('CXP_')) {
+          excludedCounts.customerInsights++;
+        } else if (excludeSystem && (flow.modifiedby as { fullname?: string })?.fullname === 'SYSTEM') {
+          excludedCounts.system++;
+        } else if (excludeCopilotSales && COPILOT_SALES_FLOW_NAMES.has(name)) {
+          excludedCounts.copilotSales++;
+        } else {
+          included.push(flow);
+        }
+      }
+      if (included.length > cap) break;
     }
 
-    if (excludeCopilotSales) {
-      const beforeCount = filteredFlows.length;
-      filteredFlows = filteredFlows.filter(
-        (flow) => !COPILOT_SALES_FLOW_NAMES.has(flow.name as string)
-      );
-      excludedCounts.copilotSales = beforeCount - filteredFlows.length;
-    }
-
-    const hasMore = filteredFlows.length > maxRecords;
-    const trimmedFlows = hasMore
-      ? filteredFlows.slice(0, maxRecords)
-      : filteredFlows;
+    const hasMore = included.length > cap;
+    const trimmedFlows = hasMore ? included.slice(0, cap) : included;
 
     const formattedFlows: FlowSummary[] = trimmedFlows.map((flow) => ({
       workflowid: flow.workflowid as string,
@@ -366,12 +370,12 @@ export class FlowService {
     return {
       totalCount: formattedFlows.length,
       hasMore,
-      requestedMax: maxRecords,
+      requestedMax: cap,
       excluded: {
         customerInsights: excludedCounts.customerInsights,
         system: excludedCounts.system,
         copilotSales: excludedCounts.copilotSales,
-        total: excludedCounts.system + excludedCounts.copilotSales,
+        total: excludedCounts.customerInsights + excludedCounts.system + excludedCounts.copilotSales,
       },
       filterApplied: {
         excludeCustomerInsights,
@@ -848,7 +852,7 @@ export class FlowService {
       maxRecords = 50,
     } = options;
 
-    const limit = Math.min(maxRecords, 250);
+    const limit = positiveCap(maxRecords);
 
     try {
       const filterConditions: string[] = [`_workflow_value eq ${odataGuid(flowId, 'flowId')}`];
@@ -867,15 +871,13 @@ export class FlowService {
 
       const filterString = filterConditions.join(' and ');
 
-      const response = await this.client.get<
-        ApiCollectionResponse<Record<string, unknown>>
-      >(
-        `api/data/v9.2/flowruns?$filter=${filterString}&$select=flowrunid,status,starttime,endtime,errorcode,errormessage,duration,triggertype&$orderby=starttime desc&$top=${limit + 1}`
+      // flowruns is an elastic table: no $count.
+      const { rows: trimmedRuns, hasMore } = await fetchCapped<Record<string, unknown>>(
+        this.client,
+        `api/data/v9.2/flowruns?$filter=${filterString}&$select=flowrunid,status,starttime,endtime,errorcode,errormessage,duration,triggertype&$orderby=starttime desc`,
+        limit,
+        { count: false },
       );
-
-      const runsData = response.value || [];
-      const hasMore = runsData.length > limit;
-      const trimmedRuns = hasMore ? runsData.slice(0, limit) : runsData;
 
       const formattedRuns: FlowRunSummary[] = trimmedRuns.map((run: Record<string, unknown>) => {
         const errorCode = run.errorcode as string | null;
@@ -908,6 +910,7 @@ export class FlowService {
         environmentId,
         totalCount: formattedRuns.length,
         hasMore,
+        requestedMax: limit,
         filterApplied: {
           status,
           startedAfter,
@@ -1042,7 +1045,7 @@ export class FlowService {
 
       return result;
     } catch (error: unknown) {
-      throw new Error(`Failed to get flow run details: ${(error as Error).message}`);
+      throw flowApiFailure('Failed to get flow run details', error);
     }
   }
 
@@ -1073,7 +1076,7 @@ export class FlowService {
         previousStatus: status,
       };
     } catch (error: unknown) {
-      throw new Error(`Failed to cancel flow run: ${(error as Error).message}`);
+      throw flowApiFailure('Failed to cancel flow run', error);
     }
   }
 
@@ -1104,7 +1107,7 @@ export class FlowService {
         triggerName,
       };
     } catch (error: unknown) {
-      throw new Error(`Failed to resubmit flow run: ${(error as Error).message}`);
+      throw flowApiFailure('Failed to resubmit flow run', error);
     }
   }
 
@@ -1278,10 +1281,12 @@ export class FlowService {
             cancelledRuns: cancelled,
             runningRuns: running,
             successRate,
+            moreRunsExist: runsResult.hasMore,
             lastRunTime: runs.length > 0 ? runs[0].startTime : null,
             lastFailureTime: lastFailure?.startTime ?? null,
             lastErrorCode: lastFailure?.error?.code ?? null,
             lastErrorMessage: lastFailure?.error?.message ?? null,
+            scanError: null,
           };
         } catch (error) {
           // Return entry with zero runs on error (e.g. access denied to flowruns)
@@ -1296,10 +1301,12 @@ export class FlowService {
             cancelledRuns: 0,
             runningRuns: 0,
             successRate: 0,
+            moreRunsExist: false,
             lastRunTime: null,
             lastFailureTime: null,
             lastErrorCode: null,
-            lastErrorMessage: error instanceof Error ? `Scan error: ${error.message}` : null,
+            lastErrorMessage: null,
+            scanError: error instanceof Error ? error.message : String(error),
           };
         }
       },
@@ -1314,7 +1321,9 @@ export class FlowService {
     // Aggregate metrics
     const flowsWithFailures = allFlows.filter((f) => f.failedRuns > 0);
     const flowsHealthy = allFlows.filter((f) => f.failedRuns === 0 && f.totalRuns > 0);
-    const flowsNoRuns = allFlows.filter((f) => f.totalRuns === 0);
+    const flowsNoRuns = allFlows.filter((f) => f.totalRuns === 0 && f.scanError === null);
+    const flowsWithScanErrors = allFlows.filter((f) => f.scanError !== null);
+    const flowsWithMoreRuns = allFlows.filter((f) => f.moreRunsExist);
     const totalRuns = allFlows.reduce((sum, f) => sum + f.totalRuns, 0);
     const totalFailures = allFlows.reduce((sum, f) => sum + f.failedRuns, 0);
     const totalSucceeded = allFlows.reduce((sum, f) => sum + f.succeededRuns, 0);
@@ -1338,6 +1347,11 @@ export class FlowService {
         flowsWithFailures: flowsWithFailures.length,
         flowsHealthy: flowsHealthy.length,
         flowsNoRuns: flowsNoRuns.length,
+        flowsWithScanErrors: flowsWithScanErrors.length,
+        flowsWithMoreRuns: flowsWithMoreRuns.length,
+        maxRunsPerFlow,
+        moreFlowsExist: flowList.hasMore,
+        maxFlows,
         totalRunsAnalyzed: totalRuns,
         totalFailures,
         overallSuccessRate,
@@ -1440,4 +1454,49 @@ export class FlowService {
 /** The Flow API path of a flow, with each segment encoded. */
 function flowsPath(environmentId: string, flowId: string): string {
   return `providers/Microsoft.ProcessSimple/environments/${encodeURIComponent(environmentId)}/flows/${encodeURIComponent(flowId)}`;
+}
+
+/**
+ * A Flow API failure as an error. `EnvironmentAccessDenied` gets an explanation: the Power
+ * Automate API refuses an identity without maker access in the environment, and a Dataverse
+ * role (even System Administrator) does not give it, so an app registration can be refused
+ * here while every Dataverse call works. Any other failure keeps its own message.
+ */
+function flowApiFailure(action: string, error: unknown): Error {
+  if (error instanceof DataverseRequestError && error.code === 'EnvironmentAccessDenied') {
+    return new Error(
+      `${action}: the Power Automate API refused this identity (403 EnvironmentAccessDenied). ` +
+      'It refuses an app registration without maker access in the environment, whatever its Dataverse ' +
+      'security roles, so run actions, cancel and resubmit are not available to it. The run list, with ' +
+      "each run's status, error code and error message, comes from Dataverse and still works " +
+      '(get-flow-runs / flow-runs).' +
+      (error.serviceMessage ? ` API message: ${error.serviceMessage}` : ''),
+    );
+  }
+  return new Error(`${action}: ${(error as Error).message}`);
+}
+
+/**
+ * What a flow health scan did not cover, as sentences: flows not scanned past the cap, rates
+ * computed from the latest runs only, and flows whose runs could not be read. `flags` names
+ * the caps as the caller knows them (CLI flags or tool arguments).
+ */
+export function flowHealthWarnings(
+  summary: FlowHealthScanResult['summary'],
+  flags: { runs: string; flows: string },
+): string[] {
+  const warnings: string[] = [];
+  if (summary.moreFlowsExist) {
+    warnings.push(`Stopped at ${flags.flows} ${summary.maxFlows}; more flows exist and were not scanned.`);
+  }
+  if (summary.flowsWithMoreRuns > 0) {
+    warnings.push(
+      `${summary.flowsWithMoreRuns} flow(s) had more runs in the window than ${flags.runs} ${summary.maxRunsPerFlow}; ` +
+      'their success rates cover the latest runs only.',
+    );
+  }
+  if (summary.flowsWithScanErrors > 0) {
+    warnings.push(`${summary.flowsWithScanErrors} flow(s) could not be scanned; see scanError on each.`);
+  }
+  return warnings;
 }

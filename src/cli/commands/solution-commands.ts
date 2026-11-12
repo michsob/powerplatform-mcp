@@ -125,16 +125,17 @@ export function registerSolutionCommands(program: Command, registry: Environment
 
   program
     .command('publishers')
-    .description('List all non-readonly publishers')
-    .action(async (_opts: unknown, command: Command) => {
+    .description('List publishers, including read-only ones that came with managed solutions')
+    .option('--writable-only', 'Only publishers that are not read-only (ones you can create components under)')
+    .action(async (opts: { writableOnly?: boolean }, command: Command) => {
       const ctx = registry.getContext(command.optsWithGlobals().env);
       const service = ctx.getSolutionService();
-      const result = await service.getPublishers();
+      const result = await service.getPublishers({ writableOnly: opts.writableOnly });
       const publishers = result.value || [];
 
       const nameList = publishers
         .slice(0, 10)
-        .map((p: Record<string, unknown>) => `${p.uniquename} (prefix: ${p.customizationprefix})`)
+        .map((p: Record<string, unknown>) => `${p.uniquename} (prefix: ${p.customizationprefix})${p.isreadonly ? ' [read-only]' : ''}`)
         .join('\n    ');
 
       outputResult({

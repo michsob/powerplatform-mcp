@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { truncationContent, truncationOf, truncationSchema } from "./truncation.js";
 
 /**
  * Register web resource tools with the MCP server.
@@ -21,6 +22,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
       outputSchema: z.object({
         webResources: z.any(),
         count: z.number(),
+        ...truncationSchema,
       }),
     },
     async ({ webResourceType, nameFilter, maxRecords, environment }) => {
@@ -31,8 +33,9 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
         const webResources = result.value || [];
 
         return {
-          structuredContent: { webResources, count: webResources.length },
+          structuredContent: { webResources, count: webResources.length, ...truncationOf(result) },
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${webResources.length} web resources:\n\n${JSON.stringify(webResources, null, 2)}`,

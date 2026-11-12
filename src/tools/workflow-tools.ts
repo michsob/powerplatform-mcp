@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { truncationContent, truncationSchema } from "./truncation.js";
 
 /**
  * Register workflow tools with the MCP server.
@@ -19,9 +20,8 @@ export function registerWorkflowTools(server: McpServer, registry: EnvironmentRe
       },
       outputSchema: z.object({
         totalCount: z.number(),
-        hasMore: z.boolean(),
-        requestedMax: z.number(),
         workflows: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ activeOnly, maxRecords, environment }) => {
@@ -33,6 +33,7 @@ export function registerWorkflowTools(server: McpServer, registry: EnvironmentRe
         return {
           structuredContent: result,
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.totalCount} workflows${result.hasMore ? ` (more available, showing first ${result.requestedMax})` : ''}:\n\n${JSON.stringify(result.workflows, null, 2)}`,
@@ -119,6 +120,7 @@ export function registerWorkflowTools(server: McpServer, registry: EnvironmentRe
         return {
           structuredContent: result,
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.totalCount} OOTB workflows:\n\n${JSON.stringify(result, null, 2)}`,

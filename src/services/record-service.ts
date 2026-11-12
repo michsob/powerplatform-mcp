@@ -1,6 +1,6 @@
 import { PowerPlatformClient } from '../powerplatform-client.js';
 import type { ApiCollectionResponse } from '../models/index.js';
-import { odataGuid, odataIdentifier } from '../odata.js';
+import { fetchCapped, odataGuid, odataIdentifier, type Truncation } from '../odata.js';
 
 /** `entitySet(<guid>)`, with both parts checked: they become part of the URL path. */
 function recordPath(entityNamePlural: string, recordId: string, idName = 'recordId'): string {
@@ -31,10 +31,15 @@ export class RecordService {
    * @param maxRecords Maximum number of records to retrieve (default: 50)
    * @returns Filtered list of records
    */
-  async queryRecords(entityNamePlural: string, filter: string, maxRecords: number = 50): Promise<ApiCollectionResponse<any>> {
-    return this.client.get<ApiCollectionResponse<any>>(
-      `api/data/v9.2/${odataIdentifier(entityNamePlural, 'entityNamePlural')}?$filter=${encodeURIComponent(filter)}&$top=${maxRecords}`
+  async queryRecords(entityNamePlural: string, filter: string, maxRecords: number = 50): Promise<ApiCollectionResponse<any> & Truncation> {
+    // No $count: the table is the caller's, and an elastic table does not support it.
+    const { rows, ...truncation } = await fetchCapped<any>(
+      this.client,
+      `api/data/v9.2/${odataIdentifier(entityNamePlural, 'entityNamePlural')}?$filter=${encodeURIComponent(filter)}`,
+      maxRecords,
+      { count: false },
     );
+    return { value: rows, ...truncation };
   }
 
   /**

@@ -1,5 +1,5 @@
 import { PowerPlatformClient } from '../powerplatform-client.js';
-import { expectAll, odataGuid, odataInteger, odataString } from '../odata.js';
+import { expectAll, fetchCapped, odataGuid, odataInteger, odataString, type Truncation } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 /**
@@ -22,7 +22,7 @@ export class WebResourceService {
     maxRecords?: number;
     webResourceType?: number;
     nameFilter?: string;
-  }): Promise<ApiCollectionResponse<Record<string, unknown>>> {
+  }): Promise<ApiCollectionResponse<Record<string, unknown>> & Truncation> {
     const maxRecords = options?.maxRecords ?? 100;
 
     const selectProperties = [
@@ -43,12 +43,13 @@ export class WebResourceService {
       filters.push(`contains(name,${odataString(options.nameFilter)})`);
     }
 
-    let url = `api/data/v9.2/webresourceset?$select=${selectProperties}&$orderby=name&$top=${maxRecords}`;
+    let url = `api/data/v9.2/webresourceset?$select=${selectProperties}&$orderby=name`;
     if (filters.length > 0) {
       url += `&$filter=${filters.join(' and ')}`;
     }
 
-    return this.client.get<ApiCollectionResponse<Record<string, unknown>>>(url);
+    const { rows, ...truncation } = await fetchCapped<Record<string, unknown>>(this.client, url, maxRecords);
+    return { value: rows, ...truncation };
   }
 
   /**

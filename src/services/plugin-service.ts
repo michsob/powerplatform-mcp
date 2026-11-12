@@ -5,7 +5,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
-import { odataGuid, odataString } from '../odata.js';
+import { fetchCapped, odataGuid, odataString, positiveCap, type Truncation } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 /** A step's execution stage by name. Stage 30 is the main operation a Custom API's plug-in runs in. */
@@ -37,7 +37,7 @@ export interface PluginStepInventoryEntry {
   modifiedOn: string;
 }
 
-export interface PluginStepInventoryResult {
+export interface PluginStepInventoryResult extends Truncation {
   [key: string]: unknown;
   totalCount: number;
   steps: PluginStepInventoryEntry[];
@@ -52,18 +52,20 @@ export class PluginService {
   async getPluginAssemblies(
     includeManaged: boolean = false,
     maxRecords: number = 100
-  ): Promise<{ totalCount: number; assemblies: unknown[] }> {
+  ): Promise<{ totalCount: number; assemblies: unknown[] } & Truncation> {
     // Hidden assemblies are excluded in the query itself. Dropping them after `$top` meant
     // the cap counted rows nobody saw, so `--max 200` could return far fewer than 200.
     const filters = ['ishidden/Value eq false'];
     if (!includeManaged) filters.push('ismanaged eq false');
 
-    const assemblies = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/pluginassemblies?$filter=${filters.join(' and ')}&$select=pluginassemblyid,name,version,culture,publickeytoken,isolationmode,sourcetype,major,minor,createdon,modifiedon,ismanaged,ishidden&$expand=modifiedby($select=fullname)&$orderby=name&$top=${maxRecords}`
+    const { rows: assemblyRows, ...truncation } = await fetchCapped<Record<string, unknown>>(
+      this.client,
+      `api/data/v9.2/pluginassemblies?$filter=${filters.join(' and ')}&$select=pluginassemblyid,name,version,culture,publickeytoken,isolationmode,sourcetype,major,minor,createdon,modifiedon,ismanaged,ishidden&$expand=modifiedby($select=fullname)&$orderby=name`,
+      maxRecords,
     );
 
     // Filter out hidden assemblies and format results
-    const formattedAssemblies = assemblies.value
+    const formattedAssemblies = assemblyRows
       .filter((assembly) => {
         const isHidden =
           (assembly.ishidden as { Value?: boolean })?.Value !== undefined
@@ -91,6 +93,7 @@ export class PluginService {
     return {
       totalCount: formattedAssemblies.length,
       assemblies: formattedAssemblies,
+      ...truncation,
     };
   }
 
@@ -370,7 +373,7 @@ export class PluginService {
     exceptionOnly?: boolean;
     hoursBack?: number;
     maxRecords?: number;
-  }): Promise<{ totalCount: number; logs: unknown[] }> {
+  }): Promise<{ totalCount: number; logs: unknown[] } & Truncation> {
     const {
       entityName,
       messageName,
@@ -399,12 +402,14 @@ export class PluginService {
 
     const filterString = filters.join(' and ');
 
-    const logs = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/plugintracelogs?$filter=${filterString}&$orderby=createdon desc&$top=${maxRecords}`
+    const { rows: logRows, ...truncation } = await fetchCapped<Record<string, unknown>>(
+      this.client,
+      `api/data/v9.2/plugintracelogs?$filter=${filterString}&$orderby=createdon desc`,
+      maxRecords,
     );
 
     // Parse logs for better readability
-    const parsedLogs = logs.value.map((log) => ({
+    const parsedLogs = logRows.map((log) => ({
       ...log,
       modeName: log.mode === 0 ? 'Synchronous' : 'Asynchronous',
       operationTypeName: this.getOperationTypeName(log.operationtype as number),
@@ -423,6 +428,7 @@ export class PluginService {
     return {
       totalCount: parsedLogs.length,
       logs: parsedLogs,
+      ...truncation,
     };
   }
 
@@ -439,29 +445,13 @@ export class PluginService {
     // the old 500 cap — orgs routinely have 3000-5000+ steps (most of them OOTB).
     const { includeDisabled = true, maxRecords = 10000 } = options ?? {};
     const statusFilter = includeDisabled ? '' : 'statuscode eq 1 and ';
-    const pageSize = Math.min(maxRecords, 500);
+    const cap = positiveCap(maxRecords);
 
-    const allRecords: Record<string, unknown>[] = [];
-    let nextUrl: string | null =
-      `api/data/v9.2/sdkmessageprocessingsteps?$filter=${statusFilter}ishidden/Value eq false&$select=sdkmessageprocessingstepid,name,stage,mode,rank,statuscode,filteringattributes,ismanaged,modifiedon&$expand=sdkmessageid($select=name),plugintypeid($select=typename,assemblyname)&$orderby=name`;
-    const preferHeader = { Prefer: `odata.maxpagesize=${pageSize}` };
-
-    while (nextUrl && allRecords.length < maxRecords) {
-      const page: ApiCollectionResponse<Record<string, unknown>> = await this.client.get(nextUrl, preferHeader);
-      allRecords.push(...page.value);
-
-      const odataNext = (page as unknown as Record<string, unknown>)['@odata.nextLink'] as string | undefined;
-      if (odataNext && allRecords.length < maxRecords) {
-        const baseUrl = this.client.organizationUrl;
-        nextUrl = odataNext.startsWith(baseUrl)
-          ? odataNext.substring(baseUrl.length + 1)
-          : odataNext;
-      } else {
-        nextUrl = null;
-      }
-    }
-
-    const trimmed = allRecords.slice(0, maxRecords);
+    const { value: records, truncated } = await this.client.getAll<Record<string, unknown>>(
+      `api/data/v9.2/sdkmessageprocessingsteps?$filter=${statusFilter}ishidden/Value eq false&$select=sdkmessageprocessingstepid,name,stage,mode,rank,statuscode,filteringattributes,ismanaged,modifiedon&$expand=sdkmessageid($select=name),plugintypeid($select=typename,assemblyname)&$orderby=name`,
+      { maxRecords: cap, pageSize: Math.min(cap, 500) },
+    );
+    const trimmed = records;
 
     const steps: PluginStepInventoryEntry[] = trimmed.map((step) => {
       const sdkmsg = step.sdkmessageid as { name?: string } | null;
@@ -489,6 +479,8 @@ export class PluginService {
     return {
       totalCount: steps.length,
       steps,
+      hasMore: truncated,
+      requestedMax: cap,
     };
   }
 
@@ -509,15 +501,18 @@ export class PluginService {
   async getPluginPackages(
     includeManaged: boolean = false,
     maxRecords: number = 100,
-  ): Promise<{ totalCount: number; packages: unknown[] }> {
+  ): Promise<{ totalCount: number; packages: unknown[] } & Truncation> {
     const managedFilter = includeManaged ? '' : 'ismanaged eq false and ';
-    const result = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/pluginpackages?$filter=${managedFilter}statecode eq 0&$select=pluginpackageid,name,uniquename,version,ismanaged,modifiedon&$orderby=name&$top=${maxRecords}`,
+    const { rows, ...truncation } = await fetchCapped<Record<string, unknown>>(
+      this.client,
+      `api/data/v9.2/pluginpackages?$filter=${managedFilter}statecode eq 0&$select=pluginpackageid,name,uniquename,version,ismanaged,modifiedon&$orderby=name`,
+      maxRecords,
     );
 
     return {
-      totalCount: result.value.length,
-      packages: result.value,
+      totalCount: rows.length,
+      packages: rows,
+      ...truncation,
     };
   }
 

@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { truncationContent, truncationOf, truncationSchema } from "./truncation.js";
 
 /**
  * Register Custom API tools with the MCP server.
@@ -19,6 +20,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
       },
       outputSchema: z.object({
         customApis: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ maxRecords, includeManaged, environment }) => {
@@ -28,8 +30,9 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
         const result = await service.getCustomApis({ maxRecords, includeManaged });
 
         return {
-          structuredContent: { customApis: result.value },
+          structuredContent: { customApis: result.value, ...truncationOf(result) },
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.value.length} Custom APIs:\n\n${JSON.stringify(result.value, null, 2)}`,

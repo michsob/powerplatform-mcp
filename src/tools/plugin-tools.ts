@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
 import { stageName } from "../services/plugin-service.js";
+import { truncationContent, truncationSchema } from "./truncation.js";
 
 /**
  * Register plugin tools with the MCP server.
@@ -21,6 +22,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       outputSchema: z.object({
         totalCount: z.number(),
         assemblies: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ includeManaged, maxRecords, environment }) => {
@@ -32,6 +34,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
         return {
           structuredContent: result,
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.totalCount} plugin assemblies:\n\n${JSON.stringify(result.assemblies, null, 2)}`,
@@ -174,6 +177,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       outputSchema: z.object({
         totalCount: z.number(),
         logs: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ entityName, messageName, correlationId, pluginStepId, exceptionOnly, hoursBack, maxRecords, environment }) => {
@@ -195,6 +199,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
         return {
           structuredContent: result,
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Plugin trace logs:\n\n` +
@@ -404,6 +409,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
         return {
           structuredContent: result,
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.totalCount} plugin steps (${enabledCount} enabled):\n\n${JSON.stringify(result.steps, null, 2)}`,

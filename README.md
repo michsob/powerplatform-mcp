@@ -61,6 +61,10 @@ POWERPLATFORM_UAT_TENANT_ID=...
 
 For local development, copy `.env.example` to `.env` and fill in your credentials.
 
+Optionally, `POWERPLATFORM_ENVIRONMENT_ID` sets the Power Platform environment id that the Flow API calls use (flow run details, cancel, resubmit). Without it, the id is looked up from Dataverse.
+
+The Flow API (api.flow.microsoft.com) refuses an app registration that has no maker access in the environment, whatever its Dataverse security roles. You'll see this as `403 EnvironmentAccessDenied`. Run lists, with each run's status and error, come from Dataverse and keep working.
+
 ## MCP Server
 
 The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilot).
@@ -68,6 +72,8 @@ The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilo
 ### Available MCP Tools (66)
 
 All tools accept an optional `environment` parameter to target a specific environment (defaults to the first configured).
+
+List tools stop at `maxRecords` and say so: `hasMore` is true when more rows match, `requestedMax` is the cap, and `totalMatching` is the full count when Dataverse counted it (up to 5,000). When the list was cut, a warning comes before the data. Caps above 5,000 are read page by page.
 
 #### Entity
 
@@ -119,7 +125,7 @@ All tools accept an optional `environment` parameter to target a specific enviro
 
 | Tool | Description | Required Params | Optional |
 |------|-------------|-----------------|----------|
-| `get-publishers` | List non-readonly publishers | | |
+| `get-publishers` | List publishers, with `isreadonly` (read-only ones came with managed solutions) | | `writableOnly` |
 | `get-solutions` | List visible solutions | | |
 | `get-solution` | Get solution by unique name | `uniqueName` | |
 | `get-solution-components` | List components in a solution | `solutionUniqueName` | |
@@ -226,6 +232,8 @@ Same tools as the MCP server, but results are cached to the file system for full
 
 `--env <name>` — target environment (defaults to first configured).
 
+A list command that stops at `--max` prints a `⚠` line saying so, with the total when Dataverse counted it. `flow-health` also warns when a flow had more runs in the window than `--max-runs` (its success rate then covers the latest runs only), when it stopped at `--max-flows`, and when a flow's runs couldn't be read.
+
 ### Commands
 
 #### Entity
@@ -296,7 +304,7 @@ deactivate-flow <flowId>
 solutions
 solution <uniqueName>
 solution-components <uniqueName>
-publishers
+publishers                                 [--writable-only]
 add-solution-component <solutionUniqueName> <componentId> <componentType>  [--add-required]
 publish-customizations                     [--entity <logicalName>]
 ```

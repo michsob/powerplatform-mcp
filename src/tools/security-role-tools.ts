@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { truncationContent, truncationOf, truncationSchema } from "./truncation.js";
 
 const privilegeAssignmentSchema = z.object({
   privilegeId: z.string().describe("Privilege ID (GUID) — use list-privileges to discover values"),
@@ -27,6 +28,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       },
       outputSchema: z.object({
         roles: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ solutionUniqueName, excludeSystemRoles, maxRecords, includePrivileges, environment }) => {
@@ -36,8 +38,9 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
         const result = await service.getSecurityRoles({ solutionUniqueName, excludeSystemRoles, maxRecords, includePrivileges });
 
         return {
-          structuredContent: { roles: result.value },
+          structuredContent: { roles: result.value, ...truncationOf(result) },
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.value.length} security roles:\n\n${JSON.stringify(result.value, null, 2)}`,
@@ -118,6 +121,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       },
       outputSchema: z.object({
         privileges: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ entityFilter, accessRightFilter, maxRecords, environment }) => {
@@ -127,8 +131,9 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
         const result = await service.listPrivileges({ entityFilter, accessRightFilter, maxRecords });
 
         return {
-          structuredContent: { privileges: result.value },
+          structuredContent: { privileges: result.value, ...truncationOf(result) },
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.value.length} privileges:\n\n${JSON.stringify(result.value, null, 2)}`,

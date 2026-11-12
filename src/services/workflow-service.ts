@@ -5,7 +5,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
-import { odataGuid, odataInteger } from '../odata.js';
+import { fetchCapped, odataGuid, odataInteger, type Truncation } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 export interface OotbWorkflowEntry {
@@ -21,7 +21,7 @@ export interface OotbWorkflowEntry {
   modifiedOn: string;
 }
 
-export interface OotbWorkflowResult {
+export interface OotbWorkflowResult extends Truncation {
   [key: string]: unknown;
   totalCount: number;
   byCategoryCount: Record<string, number>;
@@ -47,23 +47,15 @@ export class WorkflowService {
     maxRecords: number = 25
   ): Promise<{
     totalCount: number;
-    hasMore: boolean;
-    requestedMax: number;
     workflows: unknown[];
-  }> {
+  } & Truncation> {
     const stateFilter = activeOnly ? ' and statecode eq 1' : '';
-    const requestLimit = maxRecords + 1;
 
-    const workflows = await this.client.get<
-      ApiCollectionResponse<Record<string, unknown>>
-    >(
-      `api/data/v9.2/workflows?$filter=category eq 0${stateFilter}&$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,ismanaged,iscrmuiworkflow,primaryentity,mode,subprocess,ondemand,triggeroncreate,triggerondelete,syncworkflowlogonfailure,_ownerid_value&$expand=modifiedby($select=fullname)&$orderby=modifiedon desc&$top=${requestLimit}`
+    const { rows: trimmedWorkflows, ...truncation } = await fetchCapped<Record<string, unknown>>(
+      this.client,
+      `api/data/v9.2/workflows?$filter=category eq 0${stateFilter}&$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,ismanaged,iscrmuiworkflow,primaryentity,mode,subprocess,ondemand,triggeroncreate,triggerondelete,syncworkflowlogonfailure,_ownerid_value&$expand=modifiedby($select=fullname)&$orderby=modifiedon desc`,
+      maxRecords,
     );
-
-    const hasMore = workflows.value.length > maxRecords;
-    const trimmedWorkflows = hasMore
-      ? workflows.value.slice(0, maxRecords)
-      : workflows.value;
 
     const formattedWorkflows = trimmedWorkflows.map((workflow) => ({
       workflowid: workflow.workflowid,
@@ -98,9 +90,8 @@ export class WorkflowService {
 
     return {
       totalCount: formattedWorkflows.length,
-      hasMore,
-      requestedMax: maxRecords,
       workflows: formattedWorkflows,
+      ...truncation,
     };
   }
 
@@ -122,13 +113,13 @@ export class WorkflowService {
       categoryFilter = 'category ne 5';
     }
 
-    const response = await this.client.get<
-      ApiCollectionResponse<Record<string, unknown>>
-    >(
-      `api/data/v9.2/workflows?$filter=${categoryFilter}&$select=workflowid,name,category,statecode,statuscode,ismanaged,mode,primaryentity,modifiedon&$orderby=name&$top=${maxRecords}`,
+    const { rows, ...truncation } = await fetchCapped<Record<string, unknown>>(
+      this.client,
+      `api/data/v9.2/workflows?$filter=${categoryFilter}&$select=workflowid,name,category,statecode,statuscode,ismanaged,mode,primaryentity,modifiedon&$orderby=name`,
+      maxRecords,
     );
 
-    const workflows: OotbWorkflowEntry[] = response.value.map((wf) => ({
+    const workflows: OotbWorkflowEntry[] = rows.map((wf) => ({
       workflowid: wf.workflowid as string,
       name: wf.name as string,
       category: wf.category as number,
@@ -153,6 +144,7 @@ export class WorkflowService {
       totalCount: workflows.length,
       byCategoryCount,
       workflows,
+      ...truncation,
     };
   }
 
