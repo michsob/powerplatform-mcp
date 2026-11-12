@@ -6,6 +6,7 @@
  */
 
 import type { PowerPlatformClient } from '../powerplatform-client.js';
+import { odataGuid, odataInteger } from '../odata.js';
 
 interface DependencyResponse {
   value?: unknown[];
@@ -28,7 +29,7 @@ export class DependencyService {
   ): Promise<DependencyResponse> {
     return this.client.get<DependencyResponse>(
       `api/data/v9.2/RetrieveDependenciesForDelete(ObjectId=@p1,ComponentType=@p2)` +
-        `?@p1=${componentId}&@p2=${componentType}`
+        `?@p1=${odataGuid(componentId, 'componentId')}&@p2=${odataInteger(componentType, 'componentType')}`
     );
   }
 
@@ -39,23 +40,18 @@ export class DependencyService {
     componentId: string,
     componentType: number
   ): Promise<{ canDelete: boolean; dependencies: unknown[] }> {
-    try {
-      const result = await this.checkDependencies(componentId, componentType);
-      // The Web API returns an OData collection under `value`. Reading a
-      // non-existent `EntityCollection.Entities` yielded an empty array, which
-      // reported components with dependencies as safe to delete.
-      const dependencies = result.value ?? [];
+    // A failed check is an error, not "cannot delete, no dependencies": that answer would look
+    // like a result while saying nothing about why.
+    const result = await this.checkDependencies(componentId, componentType);
+    // The Web API returns an OData collection under `value`. Reading a
+    // non-existent `EntityCollection.Entities` yielded an empty array, which
+    // reported components with dependencies as safe to delete.
+    const dependencies = result.value ?? [];
 
-      return {
-        canDelete: dependencies.length === 0,
-        dependencies: dependencies,
-      };
-    } catch {
-      return {
-        canDelete: false,
-        dependencies: [],
-      };
-    }
+    return {
+      canDelete: dependencies.length === 0,
+      dependencies: dependencies,
+    };
   }
 
   /**

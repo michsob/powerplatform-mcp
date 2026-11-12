@@ -6,6 +6,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { odataGuid } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 import { ENVIRONMENT_VARIABLE_TYPES } from './environment-variable-masking.js';
 
@@ -251,7 +252,7 @@ export class ConfigurationService {
   }): Promise<{ valueId: string }> {
     if (options.existingValueId) {
       await this.client.patch(
-        `api/data/v9.2/environmentvariablevalues(${options.existingValueId})`,
+        `api/data/v9.2/environmentvariablevalues(${odataGuid(options.existingValueId, 'existingValueId')})`,
         { value: options.value },
       );
       return { valueId: options.existingValueId };
@@ -259,7 +260,7 @@ export class ConfigurationService {
 
     const body = {
       value: options.value,
-      'EnvironmentVariableDefinitionId@odata.bind': `/environmentvariabledefinitions(${options.definitionId})`,
+      'EnvironmentVariableDefinitionId@odata.bind': `/environmentvariabledefinitions(${odataGuid(options.definitionId, 'definitionId')})`,
     };
 
     const result = await this.client.post<{ entityId?: string }>(

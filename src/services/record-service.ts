@@ -1,5 +1,11 @@
 import { PowerPlatformClient } from '../powerplatform-client.js';
 import type { ApiCollectionResponse } from '../models/index.js';
+import { odataGuid, odataIdentifier } from '../odata.js';
+
+/** `entitySet(<guid>)`, with both parts checked: they become part of the URL path. */
+function recordPath(entityNamePlural: string, recordId: string, idName = 'recordId'): string {
+  return `${odataIdentifier(entityNamePlural, 'entityNamePlural')}(${odataGuid(recordId, idName)})`;
+}
 
 /**
  * Service for record operations.
@@ -15,7 +21,7 @@ export class RecordService {
    * @returns The record data
    */
   async getRecord(entityNamePlural: string, recordId: string): Promise<any> {
-    return this.client.get(`api/data/v9.2/${entityNamePlural}(${recordId})`);
+    return this.client.get(`api/data/v9.2/${recordPath(entityNamePlural, recordId)}`);
   }
 
   /**
@@ -27,7 +33,7 @@ export class RecordService {
    */
   async queryRecords(entityNamePlural: string, filter: string, maxRecords: number = 50): Promise<ApiCollectionResponse<any>> {
     return this.client.get<ApiCollectionResponse<any>>(
-      `api/data/v9.2/${entityNamePlural}?$filter=${encodeURIComponent(filter)}&$top=${maxRecords}`
+      `api/data/v9.2/${odataIdentifier(entityNamePlural, 'entityNamePlural')}?$filter=${encodeURIComponent(filter)}&$top=${maxRecords}`
     );
   }
 
@@ -39,7 +45,7 @@ export class RecordService {
    *   { "primarycontactid@odata.bind": "/contacts(<guid>)" }
    */
   async createRecord(entityNamePlural: string, data: Record<string, unknown>): Promise<{ entityId: string }> {
-    return this.client.post<{ entityId: string }>(`api/data/v9.2/${entityNamePlural}`, data);
+    return this.client.post<{ entityId: string }>(`api/data/v9.2/${odataIdentifier(entityNamePlural, 'entityNamePlural')}`, data);
   }
 
   /**
@@ -49,7 +55,7 @@ export class RecordService {
    * @param data Partial payload with fields to update
    */
   async updateRecord(entityNamePlural: string, recordId: string, data: Record<string, unknown>): Promise<void> {
-    await this.client.patch(`api/data/v9.2/${entityNamePlural}(${recordId})`, data);
+    await this.client.patch(`api/data/v9.2/${recordPath(entityNamePlural, recordId)}`, data);
   }
 
   /**
@@ -58,7 +64,7 @@ export class RecordService {
    * @param recordId The GUID of the record to delete
    */
   async deleteRecord(entityNamePlural: string, recordId: string): Promise<void> {
-    await this.client.delete(`api/data/v9.2/${entityNamePlural}(${recordId})`);
+    await this.client.delete(`api/data/v9.2/${recordPath(entityNamePlural, recordId)}`);
   }
 
   /**
@@ -78,10 +84,10 @@ export class RecordService {
     relatedRecordId: string,
   ): Promise<void> {
     const body = {
-      '@odata.id': `${this.client.organizationUrl}/api/data/v9.2/${relatedEntityNamePlural}(${relatedRecordId})`,
+      '@odata.id': `${this.client.organizationUrl}/api/data/v9.2/${recordPath(relatedEntityNamePlural, relatedRecordId, 'relatedRecordId')}`,
     };
     await this.client.post(
-      `api/data/v9.2/${entityNamePlural}(${recordId})/${navigationProperty}/$ref`,
+      `api/data/v9.2/${recordPath(entityNamePlural, recordId)}/${odataIdentifier(navigationProperty, 'navigationProperty')}/$ref`,
       body,
     );
   }
@@ -101,9 +107,9 @@ export class RecordService {
     navigationProperty: string,
     relatedRecordId?: string,
   ): Promise<void> {
-    const suffix = relatedRecordId ? `(${relatedRecordId})` : '';
+    const suffix = relatedRecordId ? `(${odataGuid(relatedRecordId, 'relatedRecordId')})` : '';
     await this.client.delete(
-      `api/data/v9.2/${entityNamePlural}(${recordId})/${navigationProperty}${suffix}/$ref`,
+      `api/data/v9.2/${recordPath(entityNamePlural, recordId)}/${odataIdentifier(navigationProperty, 'navigationProperty')}${suffix}/$ref`,
     );
   }
 }

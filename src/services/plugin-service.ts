@@ -5,6 +5,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { odataGuid, odataString } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 /** A step's execution stage by name. Stage 30 is the main operation a Custom API's plug-in runs in. */
@@ -114,7 +115,7 @@ export class PluginService {
   }> {
     // Get the plugin assembly
     const assemblies = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/pluginassemblies?$filter=name eq '${assemblyName}'&$select=pluginassemblyid,name,version,culture,publickeytoken,isolationmode,sourcetype,major,minor,createdon,modifiedon,ismanaged,ishidden,description&$expand=modifiedby($select=fullname)`
+      `api/data/v9.2/pluginassemblies?$filter=name eq ${odataString(assemblyName)}&$select=pluginassemblyid,name,version,culture,publickeytoken,isolationmode,sourcetype,major,minor,createdon,modifiedon,ismanaged,ishidden,description&$expand=modifiedby($select=fullname)`
     );
 
     if (!assemblies.value || assemblies.value.length === 0) {
@@ -230,11 +231,11 @@ export class PluginService {
   }> {
     const statusFilter = includeDisabled ? '' : ' and statuscode eq 1';
     const msgFilter = messageFilter
-      ? ` and sdkmessageid/name eq '${messageFilter}'`
+      ? ` and sdkmessageid/name eq ${odataString(messageFilter)}`
       : '';
 
     const steps = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/sdkmessageprocessingsteps?$filter=sdkmessagefilterid/primaryobjecttypecode eq '${entityName}'${statusFilter}${msgFilter}&$select=sdkmessageprocessingstepid,name,stage,mode,rank,statuscode,asyncautodelete,filteringattributes,supporteddeployment,configuration,description,_plugintypeid_value,_sdkmessagefilterid_value,_impersonatinguserid_value&$expand=sdkmessageid($select=name),plugintypeid($select=typename),impersonatinguserid($select=fullname),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=stage,rank`
+      `api/data/v9.2/sdkmessageprocessingsteps?$filter=sdkmessagefilterid/primaryobjecttypecode eq ${odataString(entityName)}${statusFilter}${msgFilter}&$select=sdkmessageprocessingstepid,name,stage,mode,rank,statuscode,asyncautodelete,filteringattributes,supporteddeployment,configuration,description,_plugintypeid_value,_sdkmessagefilterid_value,_impersonatinguserid_value&$expand=sdkmessageid($select=name),plugintypeid($select=typename),impersonatinguserid($select=fullname),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=stage,rank`
     );
 
     // Get assembly information for each plugin type
@@ -387,11 +388,11 @@ export class PluginService {
     dateThreshold.setHours(dateThreshold.getHours() - hoursBack);
     filters.push(`createdon gt ${dateThreshold.toISOString()}`);
 
-    if (entityName) filters.push(`primaryentity eq '${entityName}'`);
-    if (messageName) filters.push(`messagename eq '${messageName}'`);
-    if (correlationId) filters.push(`correlationid eq '${correlationId}'`);
+    if (entityName) filters.push(`primaryentity eq ${odataString(entityName)}`);
+    if (messageName) filters.push(`messagename eq ${odataString(messageName)}`);
+    if (correlationId) filters.push(`correlationid eq ${odataGuid(correlationId, 'correlationId')}`);
     if (pluginStepId)
-      filters.push(`_sdkmessageprocessingstepid_value eq ${pluginStepId}`);
+      filters.push(`_sdkmessageprocessingstepid_value eq ${odataGuid(pluginStepId, 'pluginStepId')}`);
     // A trace without an exception stores exceptiondetails as '' rather than null, so
     // `ne null` alone matched every row.
     if (exceptionOnly) filters.push(`exceptiondetails ne null and exceptiondetails ne ''`);
@@ -497,7 +498,7 @@ export class PluginService {
    */
   async getPluginType(typeName: string): Promise<Record<string, unknown> | null> {
     const result = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/plugintypes?$filter=typename eq '${typeName}'&$select=plugintypeid,typename,friendlyname,name,assemblyname&$top=1`,
+      `api/data/v9.2/plugintypes?$filter=typename eq ${odataString(typeName)}&$select=plugintypeid,typename,friendlyname,name,assemblyname&$top=1`,
     );
     return result.value && result.value.length > 0 ? result.value[0] : null;
   }
@@ -571,7 +572,7 @@ export class PluginService {
     }
 
     await this.client.patch(
-      `api/data/v9.2/pluginpackages(${options.pluginPackageId})`,
+      `api/data/v9.2/pluginpackages(${odataGuid(options.pluginPackageId, 'pluginPackageId')})`,
       body,
     );
   }
@@ -582,7 +583,7 @@ export class PluginService {
    */
   async getSdkMessage(messageName: string): Promise<Record<string, unknown> | null> {
     const result = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/sdkmessages?$filter=name eq '${messageName}'&$select=sdkmessageid,name,categoryname,isactive,isprivate&$top=1`,
+      `api/data/v9.2/sdkmessages?$filter=name eq ${odataString(messageName)}&$select=sdkmessageid,name,categoryname,isactive,isprivate&$top=1`,
     );
     return result.value && result.value.length > 0 ? result.value[0] : null;
   }
@@ -606,8 +607,8 @@ export class PluginService {
   }): Promise<{ stepId: string }> {
     const body: Record<string, unknown> = {
       name: options.name,
-      'plugintypeid@odata.bind': `/plugintypes(${options.pluginTypeId})`,
-      'sdkmessageid@odata.bind': `/sdkmessages(${options.sdkMessageId})`,
+      'plugintypeid@odata.bind': `/plugintypes(${odataGuid(options.pluginTypeId, 'pluginTypeId')})`,
+      'sdkmessageid@odata.bind': `/sdkmessages(${odataGuid(options.sdkMessageId, 'sdkMessageId')})`,
       stage: options.stage,
       mode: options.mode,
       rank: options.rank ?? 1,
@@ -617,7 +618,7 @@ export class PluginService {
     if (options.description) body.description = options.description;
     if (options.configuration) body.configuration = options.configuration;
     if (options.sdkMessageFilterId) {
-      body['sdkmessagefilterid@odata.bind'] = `/sdkmessagefilters(${options.sdkMessageFilterId})`;
+      body['sdkmessagefilterid@odata.bind'] = `/sdkmessagefilters(${odataGuid(options.sdkMessageFilterId, 'sdkMessageFilterId')})`;
     }
 
     const headers = options.solutionName ? { 'MSCRM.SolutionUniqueName': options.solutionName } : undefined;
@@ -649,7 +650,7 @@ export class PluginService {
       entityalias: options.entityAlias ?? name,
       imagetype: options.imageType ?? 0,
       messagepropertyname: options.messagePropertyName ?? 'Target',
-      'sdkmessageprocessingstepid@odata.bind': `/sdkmessageprocessingsteps(${options.stepId})`,
+      'sdkmessageprocessingstepid@odata.bind': `/sdkmessageprocessingsteps(${odataGuid(options.stepId, 'stepId')})`,
     };
 
     if (options.attributes) {

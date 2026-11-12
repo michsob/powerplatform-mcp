@@ -1,4 +1,5 @@
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { odataString } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 /**
@@ -13,7 +14,7 @@ export class EntityService {
    * @param entityName The logical name of the entity
    */
   async getEntityMetadata(entityName: string): Promise<any> {
-    const response = await this.client.get(`api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')`);
+    const response = await this.client.get(`api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})`);
 
     // Remove Privileges property if it exists
     if (response && typeof response === 'object' && 'Privileges' in response) {
@@ -36,7 +37,7 @@ export class EntityService {
 
     // Make the request to get attributes
     const response = await this.client.get<ApiCollectionResponse<any>>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=${selectProperties}&$filter=AttributeType ne 'Virtual'`
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes?$select=${selectProperties}&$filter=AttributeType ne 'Virtual'`
     );
 
     if (response && response.value) {
@@ -83,7 +84,7 @@ export class EntityService {
    */
   async getEntityAttribute(entityName: string, attributeName: string): Promise<any> {
     return this.client.get(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes(LogicalName='${attributeName}')`
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes(LogicalName=${odataString(attributeName)})`
     );
   }
 
@@ -106,7 +107,7 @@ export class EntityService {
 
     // Only filter by ReferencingAttribute in the OData query since startswith isn't supported
     const response = await this.client.get<ApiCollectionResponse<any>>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/OneToManyRelationships?$select=${selectProperties}&$filter=ReferencingAttribute ne 'regardingobjectid'`
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/OneToManyRelationships?$select=${selectProperties}&$filter=ReferencingAttribute ne 'regardingobjectid'`
     );
 
     // Filter the response to exclude relationships with ReferencingEntity starting with 'msdyn_' or 'adx_'
@@ -137,7 +138,7 @@ export class EntityService {
     ].join(',');
 
     return this.client.get<ApiCollectionResponse<any>>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/ManyToManyRelationships?$select=${selectProperties}`
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/ManyToManyRelationships?$select=${selectProperties}`
     );
   }
 
@@ -175,7 +176,7 @@ export class EntityService {
     solutionName?: string,
   ): Promise<void> {
     const metadata = await this.client.get<Record<string, unknown> & { MetadataId: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})`,
     );
 
     const body: Record<string, unknown> = {
@@ -234,7 +235,7 @@ export class EntityService {
 
     const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
     const result = await this.client.post<{ entityId?: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes`,
       body,
       headers,
     );
@@ -369,7 +370,7 @@ export class EntityService {
 
     const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
     const result = await this.client.post<{ entityId?: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes`,
       body,
       headers,
     );
@@ -387,7 +388,7 @@ export class EntityService {
    */
   async deleteEntityAttribute(entityName: string, attributeName: string): Promise<void> {
     await this.client.delete(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes(LogicalName='${attributeName}')`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes(LogicalName=${odataString(attributeName)})`,
     );
   }
 
@@ -444,7 +445,7 @@ export class EntityService {
 
     const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
     const result = await this.client.post<{ entityId?: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes`,
       body,
       headers,
     );
@@ -501,7 +502,7 @@ export class EntityService {
 
     const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
     const result = await this.client.post<{ entityId?: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes`,
       body,
       headers,
     );
@@ -554,7 +555,7 @@ export class EntityService {
 
     const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
     const result = await this.client.post<{ entityId?: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes`,
       body,
       headers,
     );
@@ -607,7 +608,7 @@ export class EntityService {
 
     const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
     const result = await this.client.post<{ entityId?: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes`,
       body,
       headers,
     );
@@ -677,7 +678,7 @@ export class EntityService {
 
     const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
     const result = await this.client.post<{ entityId?: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes`,
       body,
       headers,
     );
@@ -728,7 +729,7 @@ export class EntityService {
 
     const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
     const result = await this.client.post<{ entityId?: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes`,
       body,
       headers,
     );
@@ -779,7 +780,7 @@ export class EntityService {
 
     const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
     const result = await this.client.post<{ entityId?: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes`,
       body,
       headers,
     );
@@ -890,7 +891,7 @@ export class EntityService {
    */
   async getEntityKeys(entityName: string): Promise<ApiCollectionResponse<any>> {
     return this.client.get<ApiCollectionResponse<any>>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Keys`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Keys`,
     );
   }
 
@@ -920,7 +921,7 @@ export class EntityService {
 
     const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
     const result = await this.client.post<{ entityId?: string }>(
-      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Keys`,
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Keys`,
       body,
       headers,
     );

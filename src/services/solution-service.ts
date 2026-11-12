@@ -6,6 +6,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { odataString } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 /** `solutioncomponent.componenttype` labels for the component types met most often. */
@@ -52,7 +53,7 @@ export class SolutionService {
    */
   async getSolution(uniqueName: string): Promise<Record<string, unknown> | null> {
     const result = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/solutions?$filter=uniquename eq '${uniqueName}'&$top=1`
+      `api/data/v9.2/solutions?$filter=uniquename eq ${odataString(uniqueName)}&$top=1`
     );
     return result.value && result.value.length > 0 ? result.value[0] : null;
   }
