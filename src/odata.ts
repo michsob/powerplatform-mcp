@@ -118,6 +118,8 @@ export interface FetchAllOptions {
   maxRecords?: number;
   /** Server page size (`Prefer: odata.maxpagesize`). Dataverse's own default is 5,000. */
   pageSize?: number;
+  /** Extra headers for every page. A `Prefer` here is combined with the page size. */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -132,20 +134,37 @@ export async function fetchAllPages<T>(
   options: FetchAllOptions = {},
 ): Promise<{ value: T[]; truncated: boolean }> {
   const maxRecords = options.maxRecords ?? Number.POSITIVE_INFINITY;
-  const headers = options.pageSize ? { Prefer: `odata.maxpagesize=${options.pageSize}` } : undefined;
   const rows: T[] = [];
-  let next: string | undefined = endpoint;
-
-  while (next) {
-    const page: { value?: T[]; '@odata.nextLink'?: string } = await client.get(next, headers);
-    rows.push(...(page.value ?? []));
-    const link = page['@odata.nextLink'];
-    next = link ? relativeEndpoint(link, client.organizationUrl) : undefined;
+  const iterator = pages<T>(client, endpoint, options);
+  for await (const page of iterator) {
+    rows.push(...page.rows);
     if (rows.length >= maxRecords) {
-      return { value: rows.slice(0, maxRecords), truncated: rows.length > maxRecords || next !== undefined };
+      return { value: rows.slice(0, maxRecords), truncated: rows.length > maxRecords || page.more };
     }
   }
   return { value: rows, truncated: false };
+}
+
+/**
+ * The pages of a collection one at a time, following `@odata.nextLink`; `more` says whether
+ * another page follows. For a caller that filters rows as they come and stops once it has
+ * enough. The endpoint must not set `$top`.
+ */
+export async function* pages<T>(
+  client: PagingClient,
+  endpoint: string,
+  options: Pick<FetchAllOptions, 'pageSize' | 'headers'> = {},
+): AsyncGenerator<{ rows: T[]; more: boolean }> {
+  const prefer = [options.headers?.Prefer, options.pageSize ? `odata.maxpagesize=${options.pageSize}` : undefined]
+    .filter(Boolean).join(',');
+  const headers = options.headers || prefer ? { ...options.headers, ...(prefer ? { Prefer: prefer } : {}) } : undefined;
+  let next: string | undefined = endpoint;
+  while (next) {
+    const page: { value?: T[]; '@odata.nextLink'?: string } = await client.get(next, headers);
+    const link = page['@odata.nextLink'];
+    next = link ? relativeEndpoint(link, client.organizationUrl) : undefined;
+    yield { rows: page.value ?? [], more: next !== undefined };
+  }
 }
 
 /** A nextLink (absolute) as an endpoint relative to the organization URL, which `get` expects. */
@@ -154,4 +173,92 @@ function relativeEndpoint(link: string, organizationUrl: string): string {
   if (link.startsWith(prefix)) return link.slice(prefix.length);
   const url = new URL(link);
   return `${url.pathname}${url.search}`.replace(/^\/+/, '');
+}
+
+/**
+ * What a capped list says about its cap, so no caller mistakes the first N rows for the whole
+ * set. Every list that stops at a `maxRecords` carries these fields.
+ * (A type alias, not an interface, so a result that spreads it stays valid MCP `structuredContent`.)
+ */
+export type Truncation = {
+  /** True when more rows match than were returned. */
+  hasMore: boolean;
+  /** The cap that was applied. */
+  requestedMax: number;
+  /** How many rows match in all, when Dataverse counted them (it stops counting at 5,000). */
+  totalMatching?: number;
+};
+
+/** Dataverse runs `$top` as FetchXML `top`, which refuses anything above 5,000. */
+export const MAX_TOP = 5000;
+
+/** `endpoint` with more query options appended. */
+export function withQuery(endpoint: string, query: string): string {
+  return `${endpoint}${endpoint.includes('?') ? '&' : '?'}${query}`;
+}
+
+/** A row cap from a caller (a CLI flag or a tool argument): a positive integer, or an error. */
+export function positiveCap(value: number, name = 'maxRecords'): number {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${name} must be a positive integer (got ${JSON.stringify(value)})`);
+  }
+  return value;
+}
+
+/**
+ * Trim a response fetched with `$top` one above `maxRecords` (and optionally `$count=true`) to
+ * `maxRecords`, and say whether rows were cut.
+ */
+export function capRows<T>(response: { value?: T[]; [key: string]: unknown }, maxRecords: number): Truncation & { rows: T[] } {
+  const value = response.value ?? [];
+  // `$count` stops at 5,000: past that it is a floor, not a total, so it is not reported.
+  const count = response['@odata.count'];
+  const countIsFloor = typeof count === 'number'
+    && (count >= MAX_TOP || response['@Microsoft.Dynamics.CRM.totalrecordcountlimitexceeded'] === true);
+  const totalMatching = typeof count === 'number' && !countIsFloor ? count : undefined;
+  const hasMore = value.length > maxRecords || (totalMatching !== undefined && totalMatching > maxRecords);
+  return {
+    rows: value.length > maxRecords ? value.slice(0, maxRecords) : value,
+    hasMore,
+    requestedMax: maxRecords,
+    ...(totalMatching !== undefined ? { totalMatching } : {}),
+  };
+}
+
+/** The client calls `fetchCapped` needs, so tests can pass a fake. */
+export interface CappedClient extends PagingClient {
+  getAll<T>(endpoint: string, options?: FetchAllOptions): Promise<{ value: T[]; truncated: boolean }>;
+}
+
+export interface FetchCappedOptions {
+  /** Extra headers, e.g. a `Prefer` for formatted values. */
+  headers?: Record<string, string>;
+  /** Ask Dataverse for the number of matching rows (`$count=true`). Default true; turn it off
+   * for a table that may not support it (an arbitrary table, an elastic table). */
+  count?: boolean;
+}
+
+/**
+ * At most `maxRecords` rows of `endpoint`, and whether more exist.
+ *
+ * The endpoint must not set `$top`. Below 5,000 this is one request with `$top` one above the
+ * cap, so a further row shows that the list was cut (and `$count`, when on, gives the total).
+ * From 5,000 up `$top` cannot be used (Dataverse refuses more, and a full 5,000 would look
+ * complete), so the rows are paged with `@odata.nextLink` instead, up to one above the cap.
+ */
+export async function fetchCapped<T>(
+  client: CappedClient,
+  endpoint: string,
+  maxRecords: number,
+  options: FetchCappedOptions = {},
+): Promise<Truncation & { rows: T[] }> {
+  const cap = positiveCap(maxRecords);
+  if (cap < MAX_TOP) {
+    const query = `${options.count === false ? '' : '$count=true&'}$top=${cap + 1}`;
+    const response = await client.get<{ value?: T[]; [key: string]: unknown }>(withQuery(endpoint, query), options.headers);
+    return capRows(response, cap);
+  }
+  const { value, truncated } = await client.getAll<T>(endpoint, { maxRecords: cap + 1, headers: options.headers });
+  const hasMore = value.length > cap || truncated;
+  return { rows: hasMore ? value.slice(0, cap) : value, hasMore, requestedMax: cap };
 }

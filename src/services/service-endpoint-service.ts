@@ -6,6 +6,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
+import { fetchCapped, type Truncation } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 export interface ServiceEndpointSummary {
@@ -23,7 +24,7 @@ export interface ServiceEndpointSummary {
   modifiedOn: string;
 }
 
-export interface ServiceEndpointListResult {
+export interface ServiceEndpointListResult extends Truncation {
   [key: string]: unknown;
   totalCount: number;
   endpoints: ServiceEndpointSummary[];
@@ -75,13 +76,13 @@ export class ServiceEndpointService {
   async getServiceEndpoints(
     maxRecords: number = 100,
   ): Promise<ServiceEndpointListResult> {
-    const response = await this.client.get<
-      ApiCollectionResponse<Record<string, unknown>>
-    >(
-      `api/data/v9.2/serviceendpoints?$select=serviceendpointid,name,connectionmode,contract,messageformat,authtype,ismanaged,modifiedon&$orderby=name&$top=${maxRecords}`,
+    const { rows, ...truncation } = await fetchCapped<Record<string, unknown>>(
+      this.client,
+      `api/data/v9.2/serviceendpoints?$select=serviceendpointid,name,connectionmode,contract,messageformat,authtype,ismanaged,modifiedon&$orderby=name`,
+      maxRecords,
     );
 
-    const endpoints: ServiceEndpointSummary[] = response.value.map((ep) => ({
+    const endpoints: ServiceEndpointSummary[] = rows.map((ep) => ({
       serviceendpointid: ep.serviceendpointid as string,
       name: ep.name as string,
       contract: ep.contract as number,
@@ -99,6 +100,7 @@ export class ServiceEndpointService {
     return {
       totalCount: endpoints.length,
       endpoints,
+      ...truncation,
     };
   }
 }

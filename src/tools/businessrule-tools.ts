@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { truncationContent, truncationSchema } from "./truncation.js";
 
 /**
  * Register business rule tools with the MCP server.
@@ -20,6 +21,7 @@ export function registerBusinessRuleTools(server: McpServer, registry: Environme
       outputSchema: z.object({
         totalCount: z.number(),
         businessRules: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ activeOnly, maxRecords, environment }) => {
@@ -31,6 +33,7 @@ export function registerBusinessRuleTools(server: McpServer, registry: Environme
         return {
           structuredContent: result,
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.totalCount} business rules:\n\n${JSON.stringify(result.businessRules, null, 2)}`,

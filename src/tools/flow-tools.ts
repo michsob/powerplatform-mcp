@@ -1,6 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { truncationContent, truncationSchema } from "./truncation.js";
+import { flowHealthWarnings } from "../services/flow-service.js";
 
 /**
  * Register flow tools with the MCP server.
@@ -23,8 +25,8 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       },
       outputSchema: z.object({
         totalCount: z.number(),
-        hasMore: z.boolean(),
         flows: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ activeOnly, maxRecords, excludeCustomerInsights, excludeSystem, excludeCopilotSales, nameContains, environment }) => {
@@ -43,6 +45,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
         return {
           structuredContent: result,
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.totalCount} flows (excluded: ${result.excluded.total}):\n\n${JSON.stringify(result.flows, null, 2)}`,
@@ -81,8 +84,8 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       },
       outputSchema: z.object({
         totalCount: z.number(),
-        hasMore: z.boolean(),
         workflows: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ name, primaryEntity, description, category, statecode, includeDescription, maxResults, environment }) => {
@@ -102,6 +105,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
         return {
           structuredContent: result,
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.totalCount} workflows:\n\n${JSON.stringify(result.workflows, null, 2)}`,
@@ -184,8 +188,8 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       outputSchema: z.object({
         flowId: z.string(),
         totalCount: z.number(),
-        hasMore: z.boolean(),
         runs: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ flowId, status, startedAfter, startedBefore, maxRecords, environment }) => {
@@ -202,6 +206,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
         return {
           structuredContent: result,
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Flow runs for '${flowId}' (${result.totalCount} runs):\n\n${JSON.stringify(result.runs, null, 2)}`,
@@ -402,6 +407,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
                 `Scanned: ${result.summary.totalFlowsScanned} flows\n` +
                 `Healthy: ${result.summary.flowsHealthy}, Failing: ${result.summary.flowsWithFailures}, No runs: ${result.summary.flowsNoRuns}\n` +
                 `Overall success rate: ${result.summary.overallSuccessRate}%\n\n` +
+                flowHealthWarnings(result.summary, { runs: 'maxRunsPerFlow', flows: 'maxFlows' }).map((w) => `Warning: ${w}\n`).join('') +
                 `${JSON.stringify(result.topFailingFlows, null, 2)}`,
             },
           ],

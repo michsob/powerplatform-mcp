@@ -6,7 +6,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
-import { odataGuid, odataString } from '../odata.js';
+import { chunk, fetchCapped, odataAnyOf, odataGuid, odataString, type Truncation } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 import type { SolutionService } from './solution-service.js';
 
@@ -63,7 +63,7 @@ export class SecurityRoleService {
    */
   async getSecurityRoles(
     options: SecurityRoleOptions = {}
-  ): Promise<ApiCollectionResponse<Record<string, unknown>>> {
+  ): Promise<ApiCollectionResponse<Record<string, unknown>> & Partial<Truncation>> {
     const { excludeSystemRoles = true, maxRecords = 100, solutionUniqueName, includePrivileges = false } = options;
 
     if (solutionUniqueName) {
@@ -81,10 +81,10 @@ export class SecurityRoleService {
       `api/data/v9.2/roles` +
       `?$select=${select}` +
       `&$filter=${filter}` +
-      `&$orderby=name` +
-      `&$top=${maxRecords}`;
+      `&$orderby=name`;
 
-    const result = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(endpoint);
+    const { rows, ...truncation } = await fetchCapped<Record<string, unknown>>(this.client, endpoint, maxRecords);
+    const result = { value: rows, ...truncation };
 
     if (includePrivileges) {
       const rolesWithPrivileges = await Promise.all(
@@ -93,7 +93,7 @@ export class SecurityRoleService {
           return { ...role, privileges: privileges.value };
         })
       );
-      return { value: rolesWithPrivileges };
+      return { value: rolesWithPrivileges, ...truncation };
     }
 
     return result;
@@ -149,7 +149,9 @@ export class SecurityRoleService {
   private async getRolePrivilegeAssignments(
     roleId: string
   ): Promise<Array<{ privilegeid: string; privilegedepthmask: number }>> {
-    const result = await this.client.get<ApiCollectionResponse<{ privilegeid: string; privilegedepthmask: number }>>(
+    // Every page: a role can hold more privileges than one page returns, and cloning a role
+    // from a partial read would silently create it without the rest.
+    const result = await this.client.getAll<{ privilegeid: string; privilegedepthmask: number }>(
       `api/data/v9.2/roleprivilegescollection?$filter=roleid eq ${odataGuid(roleId, 'roleId')}&$select=privilegeid,privilegedepthmask`,
     );
     return result.value;
@@ -191,7 +193,7 @@ export class SecurityRoleService {
       throw new Error(`Solution '${solutionUniqueName}' not found`);
     }
 
-    const componentsResult = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
+    const componentsResult = await this.client.getAll<Record<string, unknown>>(
       `api/data/v9.2/solutioncomponents` +
       `?$filter=componenttype eq 20 and _solutionid_value eq ${solution.solutionid}` +
       `&$select=objectid,componenttype,rootcomponentbehavior`
@@ -202,14 +204,18 @@ export class SecurityRoleService {
       return { value: [] };
     }
 
-    const roleIdFilter = roleIds.map(id => `roleid eq ${id}`).join(' or ');
+    // In chunks, so a solution with many roles cannot push the filter past the URL limit.
     const select = 'roleid,name,roleidunique,ismanaged,iscustomizable,businessunitid';
-    const rolesResult = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/roles` +
-      `?$select=${select}` +
-      `&$filter=${roleIdFilter}` +
-      `&$orderby=name`
-    );
+    const roleChunks = await Promise.all(chunk(roleIds, 20).map((ids) =>
+      this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
+        `api/data/v9.2/roles` +
+        `?$select=${select}` +
+        `&$filter=${odataAnyOf('roleid', ids)}`
+      )));
+    const rolesResult = {
+      value: roleChunks.flatMap((c) => c.value)
+        .sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''))),
+    };
 
     if (includePrivileges) {
       const rolesWithPrivileges = await Promise.all(
@@ -230,7 +236,7 @@ export class SecurityRoleService {
    */
   async listPrivileges(
     options: ListPrivilegeOptions = {}
-  ): Promise<ApiCollectionResponse<Record<string, unknown>>> {
+  ): Promise<ApiCollectionResponse<Record<string, unknown>> & Truncation> {
     const { entityFilter, accessRightFilter, maxRecords = 100 } = options;
 
     const select = 'privilegeid,name,accessright,canbebasic,canbelocal,canbedeep,canbeglobal,canbeentityreference,canbeparententityreference';
@@ -247,10 +253,10 @@ export class SecurityRoleService {
       `api/data/v9.2/privileges` +
       `?$select=${select}` +
       filterClause +
-      `&$orderby=name` +
-      `&$top=${maxRecords}`;
+      `&$orderby=name`;
 
-    return this.client.get<ApiCollectionResponse<Record<string, unknown>>>(endpoint);
+    const { rows, ...truncation } = await fetchCapped<Record<string, unknown>>(this.client, endpoint, maxRecords);
+    return { value: rows, ...truncation };
   }
 
   /**

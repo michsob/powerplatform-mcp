@@ -6,7 +6,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
-import { odataGuid, odataString } from '../odata.js';
+import { fetchCapped, odataGuid, odataString, type Truncation } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 export class CustomApiService {
@@ -20,7 +20,7 @@ export class CustomApiService {
   async getCustomApis(options?: {
     maxRecords?: number;
     includeManaged?: boolean;
-  }): Promise<ApiCollectionResponse<Record<string, unknown>>> {
+  }): Promise<ApiCollectionResponse<Record<string, unknown>> & Truncation> {
     const { maxRecords = 100, includeManaged = false } = options ?? {};
 
     const select = [
@@ -44,14 +44,14 @@ export class CustomApiService {
     let endpoint =
       `api/data/v9.2/customapis` +
       `?$select=${select}` +
-      `&$orderby=uniquename` +
-      `&$top=${maxRecords}`;
+      `&$orderby=uniquename`;
 
     if (filterConditions.length > 0) {
       endpoint += `&$filter=${filterConditions.join(' and ')}`;
     }
 
-    return this.client.get<ApiCollectionResponse<Record<string, unknown>>>(endpoint);
+    const { rows, ...truncation } = await fetchCapped<Record<string, unknown>>(this.client, endpoint, maxRecords);
+    return { value: rows, ...truncation };
   }
 
   /**

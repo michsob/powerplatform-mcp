@@ -30,21 +30,30 @@ export class SolutionService {
   constructor(private client: PowerPlatformClient) {}
 
   /**
-   * Get all non-readonly publishers in the environment.
+   * Get the publishers in the environment, each with `isreadonly`.
+   *
+   * All of them by default. A publisher that came with a managed solution built in another
+   * organization (an ISV's, a partner's) is read-only here, and those are exactly the ones an
+   * `isreadonly eq false` filter hid, along with every table they own. `writableOnly`
+   * restores that filter, for picking a publisher to create components under.
    */
-  async getPublishers(): Promise<ApiCollectionResponse<Record<string, unknown>>> {
-    return this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      'api/data/v9.2/publishers?$filter=isreadonly eq false'
+  async getPublishers(options: { writableOnly?: boolean } = {}): Promise<ApiCollectionResponse<Record<string, unknown>>> {
+    const filter = options.writableOnly ? '&$filter=isreadonly eq false' : '';
+    const result = await this.client.getAll<Record<string, unknown>>(
+      'api/data/v9.2/publishers?$select=publisherid,uniquename,friendlyname,customizationprefix,customizationoptionvalueprefix,isreadonly,description,createdon,modifiedon' +
+      `${filter}&$orderby=uniquename`
     );
+    return { value: result.value };
   }
 
   /**
    * Get all visible solutions, ordered by creation date descending.
    */
   async getSolutions(): Promise<ApiCollectionResponse<Record<string, unknown>>> {
-    return this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
+    const result = await this.client.getAll<Record<string, unknown>>(
       'api/data/v9.2/solutions?$filter=isvisible eq true&$orderby=createdon desc'
     );
+    return { value: result.value };
   }
 
   /**
@@ -70,11 +79,11 @@ export class SolutionService {
       throw new Error(`Solution '${solutionUniqueName}' not found`);
     }
 
-    const components = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
+    // Every page: a large solution holds more components than one page returns.
+    const components = await this.client.getAll<Record<string, unknown>>(
       `api/data/v9.2/solutioncomponents?$filter=_solutionid_value eq ${solution.solutionid}&$orderby=componenttype`
     );
     return {
-      ...components,
       value: components.value.map((c) => ({
         ...c,
         componentTypeName: componentTypeName(c.componenttype as number),

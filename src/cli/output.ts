@@ -23,5 +23,19 @@ export function outputResult(result: CommandResult, environmentName: string): vo
   writeFileSync(filePath, JSON.stringify(result.data, null, 2), 'utf-8');
 
   console.log(result.summary);
+  const warning = truncationWarning(result.data);
+  if (warning) console.log(warning);
   console.log(`\nFull data: ${filePath}`);
+}
+
+/**
+ * The warning for a list that stopped at its cap (`hasMore`), so a partial list is never read
+ * as the whole set. Empty for anything else.
+ */
+export function truncationWarning(data: unknown): string {
+  const t = data as { hasMore?: unknown; requestedMax?: unknown; totalMatching?: unknown } | null;
+  if (!t || typeof t !== 'object' || t.hasMore !== true) return '';
+  const cap = typeof t.requestedMax === 'number' ? ` at ${t.requestedMax}` : '';
+  const of = typeof t.totalMatching === 'number' ? ` of ${t.totalMatching} matching` : '';
+  return `  ⚠ Stopped${cap}${of}; more exist. Raise --max (or narrow the filter) to see the rest.`;
 }

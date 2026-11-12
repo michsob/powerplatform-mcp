@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
+import { flowHealthWarnings } from '../../services/flow-service.js';
 
 export function registerFlowCommands(program: Command, registry: EnvironmentRegistry): void {
   program
@@ -29,7 +30,7 @@ export function registerFlowCommands(program: Command, registry: EnvironmentRegi
         fileName: 'flows',
         data: result,
         summary: [
-          `Found ${result.totalCount} flows${result.hasMore ? ' (more available)' : ''}:`,
+          `Found ${result.totalCount} flows:`,
           result.excluded.total > 0 ? `  Excluded: ${result.excluded.total} (system: ${result.excluded.system}, copilot: ${result.excluded.copilotSales})` : '',
           `  Flows:\n    ${nameList}${result.totalCount > 10 ? '\n    ...' : ''}`,
         ].filter(Boolean).join('\n'),
@@ -110,7 +111,7 @@ export function registerFlowCommands(program: Command, registry: EnvironmentRegi
         fileName: `flow-${flowId}-runs`,
         data: result,
         summary: [
-          `Flow runs for ${flowId}${result.hasMore ? ' (more available)' : ''}:`,
+          `Flow runs for ${flowId}:`,
           `  Total: ${result.totalCount}`,
           `  By status: ${statusSummary}`,
         ].join('\n'),
@@ -181,7 +182,7 @@ export function registerFlowCommands(program: Command, registry: EnvironmentRegi
         fileName: 'search-workflows',
         data: result,
         summary: [
-          `Found ${result.totalCount} workflows${result.hasMore ? ' (more available)' : ''}:`,
+          `Found ${result.totalCount} workflows:`,
           result.totalCount > 0 ? `  Workflows:\n    ${nameList}${result.totalCount > 10 ? '\n    ...' : ''}` : '',
         ].filter(Boolean).join('\n'),
       }, ctx.environmentName);
@@ -218,6 +219,7 @@ export function registerFlowCommands(program: Command, registry: EnvironmentRegi
           `  Healthy: ${result.summary.flowsHealthy}, Failing: ${result.summary.flowsWithFailures}, No runs: ${result.summary.flowsNoRuns}`,
           `  Overall success rate: ${result.summary.overallSuccessRate}%`,
           result.topFailingFlows.length > 0 ? `  Top failing flows:\n${topList}` : '',
+          ...flowHealthWarnings(result.summary, { runs: '--max-runs', flows: '--max-flows' }).map((w) => `  ⚠ ${w}`),
         ].filter(Boolean).join('\n'),
       }, ctx.environmentName);
     });
@@ -248,7 +250,6 @@ export function registerFlowCommands(program: Command, registry: EnvironmentRegi
           `Flow inventory: ${result.totalCount} flows`,
           `  By state: ${stateSummary}`,
           result.excluded > 0 ? `  Excluded: ${result.excluded}` : '',
-          result.hasMore ? `  ⚠ Stopped at --max ${result.requestedMax}; more flows exist. Raise --max to see them all.` : '',
         ].filter(Boolean).join('\n'),
       }, ctx.environmentName);
     });

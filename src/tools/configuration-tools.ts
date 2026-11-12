@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
 import { maskEnvironmentVariables } from "../services/environment-variable-masking.js";
+import { truncationContent, truncationOf, truncationSchema } from "./truncation.js";
 
 /**
  * Register configuration tools with the MCP server.
@@ -22,6 +23,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       },
       outputSchema: z.object({
         connectionReferences: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ maxRecords, managedOnly, hasConnection, inactive, environment }) => {
@@ -31,8 +33,9 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
         const result = await service.getConnectionReferences({ maxRecords, managedOnly, hasConnection, inactive });
 
         return {
-          structuredContent: { connectionReferences: result.value },
+          structuredContent: { connectionReferences: result.value, ...truncationOf(result) },
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.value.length} connection references:\n\n${JSON.stringify(result.value, null, 2)}`,
@@ -168,6 +171,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       },
       outputSchema: z.object({
         environmentVariables: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ maxRecords, managedOnly, environment }) => {
@@ -177,8 +181,9 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
         const result = maskEnvironmentVariables(await service.getEnvironmentVariables({ maxRecords, managedOnly }));
 
         return {
-          structuredContent: { environmentVariables: result.value },
+          structuredContent: { environmentVariables: result.value, ...truncationOf(result) },
           content: [
+            ...truncationContent(result),
             {
               type: "text",
               text: `Found ${result.value.length} environment variables:\n\n${JSON.stringify(result.value, null, 2)}`,

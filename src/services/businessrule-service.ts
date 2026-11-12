@@ -5,7 +5,7 @@
  */
 
 import { PowerPlatformClient } from '../powerplatform-client.js';
-import { odataGuid } from '../odata.js';
+import { fetchCapped, odataGuid, type Truncation } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
 // `ownerid` is a polymorphic lookup to `principal` (a systemuser *or* a team),
@@ -30,20 +30,20 @@ export class BusinessRuleService {
   ): Promise<{
     totalCount: number;
     businessRules: unknown[];
-  }> {
+  } & Truncation> {
     // Category 2 = Business Rule
     // StateCode: 0=Draft, 1=Activated, 2=Suspended
     // Type: 1=Definition
     const stateFilter = activeOnly ? ' and statecode eq 1' : '';
 
-    const businessRules = await this.client.get<
-      ApiCollectionResponse<Record<string, unknown>>
-    >(
-      `api/data/v9.2/workflows?$filter=category eq 2${stateFilter}&$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,ismanaged,primaryentity,_ownerid_value&$expand=modifiedby($select=fullname)&$orderby=modifiedon desc&$top=${maxRecords}`,
-      FORMATTED_VALUES
+    const { rows, ...truncation } = await fetchCapped<Record<string, unknown>>(
+      this.client,
+      `api/data/v9.2/workflows?$filter=category eq 2${stateFilter}&$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,ismanaged,primaryentity,_ownerid_value&$expand=modifiedby($select=fullname)&$orderby=modifiedon desc`,
+      maxRecords,
+      { headers: FORMATTED_VALUES },
     );
 
-    const formattedBusinessRules = businessRules.value.map((rule) => ({
+    const formattedBusinessRules = rows.map((rule) => ({
       workflowid: rule.workflowid,
       name: rule.name,
       description: rule.description,
@@ -72,6 +72,7 @@ export class BusinessRuleService {
     return {
       totalCount: formattedBusinessRules.length,
       businessRules: formattedBusinessRules,
+      ...truncation,
     };
   }
 

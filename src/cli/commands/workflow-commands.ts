@@ -25,7 +25,7 @@ export function registerWorkflowCommands(program: Command, registry: Environment
         fileName: 'workflows',
         data: result,
         summary: [
-          `Found ${result.totalCount} classic workflows${result.hasMore ? ' (more available)' : ''}:`,
+          `Found ${result.totalCount} classic workflows:`,
           result.totalCount > 0 ? `  Workflows:\n    ${nameList}${result.totalCount > 10 ? '\n    ...' : ''}` : '',
         ].filter(Boolean).join('\n'),
       }, ctx.environmentName);

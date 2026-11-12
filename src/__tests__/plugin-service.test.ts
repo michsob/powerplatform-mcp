@@ -80,7 +80,8 @@ describe('getPluginAssemblies', () => {
     const service = new PluginService(fakeClient([['pluginassemblies', { value: [] }]], calls));
     await service.getPluginAssemblies(false, 25);
     expect(calls[0].endpoint).toContain('$filter=ishidden/Value eq false and ismanaged eq false');
-    expect(calls[0].endpoint).toContain('$top=25');
+    // One row over the cap, so a further row shows the list was cut.
+    expect(calls[0].endpoint).toContain('$count=true&$top=26');
 
     await service.getPluginAssemblies(true, 25);
     expect(calls[1].endpoint).toContain('$filter=ishidden/Value eq false&');

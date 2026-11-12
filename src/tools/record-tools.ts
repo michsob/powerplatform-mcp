@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { truncationContent, truncationOf, truncationSchema } from "./truncation.js";
 
 /**
  * Register record tools with the MCP server.
@@ -69,6 +70,7 @@ export function registerRecordTools(server: McpServer, registry: EnvironmentRegi
         filter: z.string(),
         count: z.number(),
         records: z.any(),
+        ...truncationSchema,
       }),
     },
     async ({ entityNamePlural, filter, maxRecords, environment }) => {
@@ -79,8 +81,9 @@ export function registerRecordTools(server: McpServer, registry: EnvironmentRegi
         const recordCount = records.value?.length || 0;
 
         return {
-          structuredContent: { entityNamePlural, filter, count: recordCount, records },
+          structuredContent: { entityNamePlural, filter, count: recordCount, records, ...truncationOf(records) },
           content: [
+            ...truncationContent(records),
             {
               type: "text",
               text: `Retrieved ${recordCount} records from '${entityNamePlural}' with filter '${filter}':\n\n${JSON.stringify(records, null, 2)}`,
