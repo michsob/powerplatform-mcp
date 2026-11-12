@@ -72,7 +72,7 @@ export class SecurityRoleService {
 
     let filter = '(ismanaged eq false or iscustomizable/Value eq true)';
     if (excludeSystemRoles) {
-      const exclusions = SYSTEM_ROLE_NAMES.map(name => `name ne '${name}'`).join(' and ');
+      const exclusions = SYSTEM_ROLE_NAMES.map(name => `name ne ${odataString(name)}`).join(' and ');
       filter += ` and ${exclusions}`;
     }
 
@@ -239,7 +239,7 @@ export class SecurityRoleService {
       filterParts.push(`contains(name,${odataString(entityFilter)})`);
     }
     if (accessRightFilter) {
-      filterParts.push(`startswith(name,'prv${accessRightFilter.replace(/'/g, "''")}')`);
+      filterParts.push(`startswith(name,${odataString(`prv${accessRightFilter}`)})`);
     }
 
     const filterClause = filterParts.length > 0 ? `&$filter=${filterParts.join(' and ')}` : '';
