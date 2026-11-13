@@ -623,12 +623,18 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
     .description('Create an alternate key on a Dataverse entity')
     .argument('<keyAttributes...>', 'Attribute logical names that make up the key')
     .option('--solution <name>', 'Solution unique name to add the component to')
+    .option('--language-code <lcid>', 'Language code (LCID) of the display name label, e.g. 1033 for English', '1045')
     .action(async (entityName: string, schemaName: string, displayName: string, keyAttributes: string[], opts: {
       solution?: string;
+      languageCode: string;
     }, command: Command) => {
+      const languageCode = Number(opts.languageCode);
+      if (!Number.isInteger(languageCode) || languageCode <= 0) {
+        throw new Error(`--language-code must be a positive whole number (an LCID such as 1033), not '${opts.languageCode}'.`);
+      }
       const ctx = registry.getContext(command.optsWithGlobals().env);
       const service = ctx.getEntityService();
-      const result = await service.createAlternateKey(entityName, schemaName, displayName, keyAttributes, undefined, opts.solution);
+      const result = await service.createAlternateKey(entityName, schemaName, displayName, keyAttributes, languageCode, opts.solution);
 
       outputResult({
         fileName: `${entityName}-create-key-${schemaName}`,
@@ -640,6 +646,21 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
           `  Key Attributes: ${keyAttributes.join(', ')}`,
           `  Key ID: ${result.keyId}`,
         ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('delete-entity-alternate-key <entityName> <keyName>')
+    .description('Delete an alternate key from a Dataverse entity (irreversible)')
+    .action(async (entityName: string, keyName: string, _opts: unknown, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getEntityService();
+      await service.deleteAlternateKey(entityName, keyName);
+
+      outputResult({
+        fileName: `${entityName}-delete-key-${keyName}`,
+        data: { deleted: true, entityName, keyName },
+        summary: `Deleted alternate key '${keyName}' from '${entityName}'.`,
       }, ctx.environmentName);
     });
 
