@@ -256,6 +256,7 @@ create-entity-picklist-attribute <entityName> <schemaName> <displayName>  [-o <v
 create-entity-lookup <referencingEntity> <referencedEntity> <relationshipSchemaName> <lookupSchemaName> <displayName>  [--required-level <level>] [--description <desc>] [--cascade-delete <NoCascade|RemoveLink|Restrict|Cascade>] [--solution <name>]
 create-entity-alternate-key <entityName> <schemaName> <displayName> <keyAttributes...>  [--language-code <lcid>] [--solution <name>]
 delete-entity-alternate-key <entityName> <keyName>
+set-entity-change-tracking <entityName> <on|off>  [--solution <name>] [--no-publish]
 delete-entity-attribute <entityName> <attributeName>
 ```
 
