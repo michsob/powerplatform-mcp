@@ -85,7 +85,7 @@ List tools stop at `maxRecords` and say so: `hasMore` is true when more rows mat
 | `get-entity-relationships` | Get 1:N and N:N relationships | `entityName` | |
 | `create-entity-string-attribute` | Create a Single Line of Text column | `entityName`, `schemaName`, `displayName` | `maxLength`, `requiredLevel`, `description`, `solutionName` |
 | `get-entity-keys` | List alternate keys on an entity | `entityName` | |
-| `create-entity-alternate-key` | Create an alternate key | `entityName`, `schemaName`, `displayName`, `keyAttributes` | `solutionName` |
+| `create-entity-alternate-key` | Create an alternate key | `entityName`, `schemaName`, `displayName`, `keyAttributes` | `languageCode`, `solutionName` |
 
 #### Records
 
@@ -254,7 +254,8 @@ create-entity-boolean-attribute <entityName> <schemaName> <displayName>  [--true
 create-entity-datetime-attribute <entityName> <schemaName> <displayName>  [--format <DateOnly|DateAndTime>] [--behavior <UserLocal|DateOnly|TimeZoneIndependent>] [--required-level <level>] [--description <desc>] [--solution <name>]
 create-entity-picklist-attribute <entityName> <schemaName> <displayName>  [-o <value:label>]... [--required-level <level>] [--description <desc>] [--solution <name>]
 create-entity-lookup <referencingEntity> <referencedEntity> <relationshipSchemaName> <lookupSchemaName> <displayName>  [--required-level <level>] [--description <desc>] [--cascade-delete <NoCascade|RemoveLink|Restrict|Cascade>] [--solution <name>]
-create-entity-alternate-key <entityName> <schemaName> <displayName> <keyAttributes...>  [--solution <name>]
+create-entity-alternate-key <entityName> <schemaName> <displayName> <keyAttributes...>  [--language-code <lcid>] [--solution <name>]
+delete-entity-alternate-key <entityName> <keyName>
 delete-entity-attribute <entityName> <attributeName>
 ```
 

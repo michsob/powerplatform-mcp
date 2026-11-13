@@ -250,6 +250,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         schemaName: z.string().describe("The schema name for the key"),
         displayName: z.string().describe("The display name for the key"),
         keyAttributes: z.array(z.string()).describe("Array of attribute logical names that make up the key"),
+        languageCode: z.number().int().positive().optional().describe("Language code (LCID) of the display name label, e.g. 1033 for English. Defaults to 1045."),
         solutionName: z.string().optional().describe("Solution unique name to add the component to"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
@@ -259,11 +260,11 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         keyId: z.string(),
       }),
     },
-    async ({ entityName, schemaName, displayName, keyAttributes, solutionName, environment }) => {
+    async ({ entityName, schemaName, displayName, keyAttributes, languageCode, solutionName, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getEntityService();
-        const result = await service.createAlternateKey(entityName, schemaName, displayName, keyAttributes, undefined, solutionName);
+        const result = await service.createAlternateKey(entityName, schemaName, displayName, keyAttributes, languageCode, solutionName);
 
         return {
           structuredContent: { entityName, schemaName, keyId: result.keyId },

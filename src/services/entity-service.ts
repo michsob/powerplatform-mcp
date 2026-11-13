@@ -928,4 +928,15 @@ export class EntityService {
 
     return { keyId: result?.entityId ?? 'created' };
   }
+
+  /**
+   * Delete an alternate key from an entity. Irreversible: the key's index is dropped.
+   * @param entityName The logical name of the entity
+   * @param keyName The logical name of the key
+   */
+  async deleteAlternateKey(entityName: string, keyName: string): Promise<void> {
+    await this.client.delete(
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Keys(LogicalName=${odataString(keyName)})`,
+    );
+  }
 }
