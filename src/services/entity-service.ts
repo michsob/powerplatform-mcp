@@ -196,6 +196,35 @@ export class EntityService {
   }
 
   /**
+   * Turn change tracking on or off for an entity, so `RetrieveEntityChanges` (and Azure Synapse Link, and offline sync)
+   * can read what changed since a version. Like every metadata update this is a full-replace PUT of the entity's
+   * metadata with `ChangeTrackingEnabled` changed; `MergeLabels` keeps the localized labels. Publish afterwards.
+   *
+   * @param entityName Logical name (e.g. 'contoso_project')
+   * @param enabled Whether changes are tracked
+   * @param solutionName Optional solution to scope the metadata change to
+   * @returns Whether the setting changed (false when it was already as asked)
+   */
+  async setChangeTracking(entityName: string, enabled: boolean, solutionName?: string): Promise<{ changed: boolean }> {
+    const metadata = await this.client.get<Record<string, unknown> & { MetadataId: string; ChangeTrackingEnabled?: boolean }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})`,
+    );
+    if (metadata.ChangeTrackingEnabled === enabled) return { changed: false };
+
+    const body: Record<string, unknown> = {
+      ...metadata,
+      '@odata.type': 'Microsoft.Dynamics.CRM.EntityMetadata',
+      ChangeTrackingEnabled: enabled,
+    };
+
+    const headers: Record<string, string> = { 'MSCRM.MergeLabels': 'true' };
+    if (solutionName) headers['MSCRM.SolutionUniqueName'] = solutionName;
+
+    await this.client.put(`api/data/v9.2/EntityDefinitions(${metadata.MetadataId})`, body, headers);
+    return { changed: true };
+  }
+
+  /**
    * Create a string (Single Line of Text) attribute on an entity.
    * @param entityName The logical name of the entity
    * @param schemaName The schema name for the new attribute (e.g. contoso_externalid)

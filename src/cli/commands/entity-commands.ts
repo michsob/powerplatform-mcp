@@ -665,6 +665,32 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
     });
 
   program
+    .command('set-entity-change-tracking <entityName> <state>')
+    .description('Turn change tracking on or off for a Dataverse entity (state: on or off), then publish it')
+    .option('--solution <name>', 'Solution unique name to scope the metadata change to')
+    .option('--no-publish', 'Skip publishing the entity afterwards')
+    .action(async (entityName: string, state: string, opts: { solution?: string; publish: boolean }, command: Command) => {
+      const normalised = state.toLowerCase();
+      if (normalised !== 'on' && normalised !== 'off') {
+        throw new Error(`state must be 'on' or 'off', not '${state}'.`);
+      }
+      const enabled = normalised === 'on';
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const { changed } = await ctx.getEntityService().setChangeTracking(entityName, enabled, opts.solution);
+      if (changed && opts.publish !== false) {
+        await ctx.getSolutionService().publishCustomizations(entityName);
+      }
+
+      outputResult({
+        fileName: `${entityName}-change-tracking`,
+        data: { entityName, changeTrackingEnabled: enabled, changed, published: changed && opts.publish !== false },
+        summary: changed
+          ? `Change tracking turned ${normalised} for '${entityName}'${opts.publish !== false ? ' and published' : ' (not published)'}.`
+          : `Change tracking was already ${normalised} for '${entityName}'; nothing changed.`,
+      }, ctx.environmentName);
+    });
+
+  program
     .command('entity-relationships <entityName>')
     .description('Get all relationships for a Dataverse entity')
     .action(async (entityName: string, _opts: unknown, command: Command) => {
