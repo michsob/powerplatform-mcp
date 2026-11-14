@@ -252,7 +252,7 @@ create-entity-decimal-attribute <entityName> <schemaName> <displayName>  [--prec
 create-entity-money-attribute <entityName> <schemaName> <displayName>  [--precision-source <0|1|2>] [--precision <n>] [--min <n>] [--max <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
 create-entity-boolean-attribute <entityName> <schemaName> <displayName>  [--true-label <label>] [--false-label <label>] [--default-value <true|false>] [--required-level <level>] [--description <desc>] [--solution <name>]
 create-entity-datetime-attribute <entityName> <schemaName> <displayName>  [--format <DateOnly|DateAndTime>] [--behavior <UserLocal|DateOnly|TimeZoneIndependent>] [--required-level <level>] [--description <desc>] [--solution <name>]
-create-entity-picklist-attribute <entityName> <schemaName> <displayName>  [-o <value:label>]... [--required-level <level>] [--description <desc>] [--solution <name>]
+create-entity-picklist-attribute <entityName> <schemaName> <displayName>  [-o <value:label>]... | [--global-option-set <name>] [--default-value <value>] [--required-level <level>] [--description <desc>] [--language-code <lcid>] [--solution <name>]
 create-entity-lookup <referencingEntity> <referencedEntity> <relationshipSchemaName> <lookupSchemaName> <displayName>  [--required-level <level>] [--description <desc>] [--cascade-delete <NoCascade|RemoveLink|Restrict|Cascade>] [--solution <name>]
 create-entity-alternate-key <entityName> <schemaName> <displayName> <keyAttributes...>  [--language-code <lcid>] [--solution <name>]
 delete-entity-alternate-key <entityName> <keyName>
