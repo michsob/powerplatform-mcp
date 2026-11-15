@@ -16,6 +16,7 @@ import {
   ServiceEndpointService,
   CustomApiService,
   WebResourceService,
+  ApplicationUserService,
 } from './services/index.js';
 import type { ServiceContext } from './types.js';
 
@@ -148,6 +149,7 @@ export class EnvironmentRegistry {
     let serviceEndpointService: ServiceEndpointService | null = null;
     let customApiService: CustomApiService | null = null;
     let webResourceService: WebResourceService | null = null;
+    let applicationUserService: ApplicationUserService | null = null;
 
     const ctx: ServiceContext = {
       environmentName: name,
@@ -169,6 +171,7 @@ export class EnvironmentRegistry {
       getServiceEndpointService: () => (serviceEndpointService ??= new ServiceEndpointService(getClient())),
       getCustomApiService: () => (customApiService ??= new CustomApiService(getClient())),
       getWebResourceService: () => (webResourceService ??= new WebResourceService(getClient())),
+      getApplicationUserService: () => (applicationUserService ??= new ApplicationUserService(getClient())),
     };
 
     this.contexts.set(name, ctx);
