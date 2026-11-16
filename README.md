@@ -361,6 +361,7 @@ create-custom-api-request-parameter <customApiId> <uniqueName> <displayName>  [-
 web-resources                              [--type <n>] [--name <contains>] [--max <n>]
 web-resource <name>
 create-web-resource <name> <displayName> <filePath>  [--type <n>] [--description <desc>] [--solution <name>]
+push-web-resources <folder> <namePrefix>    [--solution <name>] [--no-publish]     # every file, named <namePrefix><path>, type from extension; writes only changed ones, then publishes them
 set-entity-icon <entityName> <svgFilePath>  [--solution <name>] [--web-resource-name <name>] [--display-name <name>] [--no-publish]
 ```
 
@@ -370,6 +371,7 @@ entity-forms <entityName>                  [--type <n>]
 entity-form-fields <formId>
 add-form-field <entityName> <formId> <attributeName>
 remove-form-field <entityName> <formId> <attributeName>
+add-form-web-resource-tab <entityName> <formId> <label> <webResource>  [--tab-name <name>] [--rows <n>] [--no-pass-parameters] [--language-code <lcid>] [--solution <name>] [--dry-run]   # last tab, one HTML web resource; run again it replaces the tab; joins a solution only with --solution
 set-form-layout <entityName> <formId> <layoutFile>       [--dry-run]
 entity-views <entityName>
 add-view-column <entityName> <viewId> <attributeName>   [--width <n>]
@@ -441,6 +443,15 @@ add-role-privileges <roleId>               --privileges <spec>     # JSON array 
 remove-role-privileges <roleId>            --privileges <id,id,id>
 replace-role-privileges <roleId>           --privileges <spec> --yes
 ```
+
+#### Model-driven Apps
+```
+create-model-driven-app <uniqueName> <displayName>  [--table <logicalName>]... [--group <Title=table,table>]... [--page <Group/Title=webresource[,icon]>]... [--solution-tables] [--group-title <title>] [--area-title <title>] [--description <desc>] [--solution <name>] [--language-code <lcid>] [--no-publish]
+```
+
+A `--page` is a web resource (an HTML page) in the app's site map, first in its group, with an optional SVG web resource as its icon; a group that only pages name comes before the others. Every page's web resource must exist and be published.
+
+An app to browse tables in: the app (Unified Interface, the default icon), its site map (one area; a group per `--group`, and `--table`s and `--solution-tables` in a default group; a subarea per table) and the tables as app components. No forms or views are picked, so users see every form and view of each table. The app is validated and published (ValidateApp's warnings are printed; an error stops it before publishing). Run again, it rewrites the site map to the tables given and adds the tables the app lacks; it removes no component. System administrators and customizers see every app; other users need a security role associated with it.
 
 #### Application Users
 ```

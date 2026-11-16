@@ -14,6 +14,7 @@ import type { ServiceEndpointService } from "./services/service-endpoint-service
 import type { CustomApiService } from "./services/customapi-service.js";
 import type { WebResourceService } from "./services/webresource-service.js";
 import type { ApplicationUserService } from "./services/application-user-service.js";
+import type { ModelDrivenAppService } from "./services/model-driven-app-service.js";
 
 /**
  * Service context providing lazy-initialized service getters.
@@ -37,4 +38,5 @@ export interface ServiceContext {
   getCustomApiService: () => CustomApiService;
   getWebResourceService: () => WebResourceService;
   getApplicationUserService: () => ApplicationUserService;
+  getModelDrivenAppService: () => ModelDrivenAppService;
 }

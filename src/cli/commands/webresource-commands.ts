@@ -1,5 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { extname, join } from 'node:path';
 import type { Command } from 'commander';
+import { WEB_RESOURCE_TYPE_BY_EXTENSION, type WebResourceFile } from '../../services/webresource-service.js';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
 
@@ -103,6 +105,31 @@ export function registerWebResourceCommands(program: Command, registry: Environm
     });
 
   program
+    .command('push-web-resources <folder> <namePrefix>')
+    .description('Create or update a web resource for every file in a folder (and its subfolders), named <namePrefix><path>, the type from the extension; only changed files are written, then published together')
+    .option('--solution <name>', 'Solution unique name to add the web resources to')
+    .option('--no-publish', 'Leave the written web resources unpublished')
+    .action(async (folder: string, namePrefix: string, opts: { solution?: string; publish: boolean }, command: Command) => {
+      const { files, skipped } = webResourceFiles(folder, namePrefix);
+      if (files.length === 0) throw new Error(`No web resource file in '${folder}'${skipped.length ? ` (skipped: ${skipped.join(', ')})` : ''}.`);
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const result = await ctx.getWebResourceService().pushWebResources(files, { solutionName: opts.solution, publish: opts.publish });
+
+      const count = (status: string) => result.results.filter((r) => r.status === status).length;
+      outputResult({
+        fileName: `push-web-resources-${namePrefix.replace(/[^A-Za-z0-9_-]+/g, '_')}`,
+        data: { ...result, skipped },
+        summary: [
+          `Pushed ${files.length} web resource(s) from '${folder}': ${count('created')} created, ${count('updated')} updated, ${count('unchanged')} unchanged`,
+          ...result.results.map((r) => `  ${r.status.padEnd(9)} ${r.name}`),
+          skipped.length ? `  Skipped (no web resource type): ${skipped.join(', ')}` : '',
+          result.published ? '  Published the written ones' : opts.publish ? '  Nothing to publish' : '  Not published (--no-publish)',
+          opts.solution ? `  Solution: ${opts.solution}` : '',
+        ].filter(Boolean).join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
     .command('set-entity-icon <entityName> <svgFilePath>')
     .description('Upload an SVG (or reuse existing) and set it as the entity icon in Dataverse')
     .option('--solution <name>', 'Solution unique name to add the webresource/entity to')
@@ -148,4 +175,23 @@ export function registerWebResourceCommands(program: Command, registry: Environm
         ].join('\n'),
       }, ctx.environmentName);
     });
+}
+
+/** The files of a folder and its subfolders as web resources: `<namePrefix><relative path with />`, the type from the extension. */
+export function webResourceFiles(folder: string, namePrefix: string): { files: WebResourceFile[]; skipped: string[] } {
+  const files: WebResourceFile[] = [];
+  const skipped: string[] = [];
+  const walk = (dir: string, relative: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (entry.name.startsWith('.')) continue;
+      const path = join(dir, entry.name);
+      const rel = relative ? `${relative}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) { walk(path, rel); continue; }
+      const type = WEB_RESOURCE_TYPE_BY_EXTENSION[extname(entry.name).toLowerCase()];
+      if (!type) { skipped.push(rel); continue; }
+      files.push({ name: `${namePrefix}${rel}`, displayName: entry.name, webResourceType: type, content: readFileSync(path).toString('base64') });
+    }
+  };
+  walk(folder, '');
+  return { files, skipped };
 }

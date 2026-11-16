@@ -17,6 +17,7 @@ import { registerCustomApiCommands } from './customapi-commands.js';
 import { registerWebResourceCommands } from './webresource-commands.js';
 import { registerPacCommands } from './pac-commands.js';
 import { registerApplicationUserCommands } from './application-user-commands.js';
+import { registerModelDrivenAppCommands } from './model-driven-app-commands.js';
 
 export function registerAllCommands(program: Command, registry: EnvironmentRegistry): void {
   registerEntityCommands(program, registry);
@@ -32,6 +33,7 @@ export function registerAllCommands(program: Command, registry: EnvironmentRegis
   registerConfigurationCommands(program, registry);
   registerSecurityRoleCommands(program, registry);
   registerApplicationUserCommands(program, registry);
+  registerModelDrivenAppCommands(program, registry);
   registerServiceEndpointCommands(program, registry);
   registerCustomApiCommands(program, registry);
   registerWebResourceCommands(program, registry);
