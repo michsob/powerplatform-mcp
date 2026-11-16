@@ -169,7 +169,7 @@ List tools stop at `maxRecords` and say so: `hasMore` is true when more rows mat
 |------|-------------|-----------------|----------|
 | `get-custom-apis` | List Custom API definitions | | `maxRecords`, `includeManaged` |
 | `get-custom-api` | Get a Custom API by unique name | `uniqueName` | |
-| `create-custom-api` | Create a Custom API definition | `uniqueName`, `name`, `displayName`, `bindingType`, `isFunction`, `isPrivate`, `allowedCustomProcessingStepType` | `description`, `pluginTypeId`, `pluginTypeName`, `boundEntityLogicalName`, `solutionName` |
+| `create-custom-api` | Create a Custom API definition | `uniqueName`, `name`, `displayName`, `bindingType`, `isFunction`, `isPrivate`, `allowedCustomProcessingStepType` | `description`, `pluginTypeId`, `pluginTypeName`, `boundEntityLogicalName`, `executePrivilegeName`, `solutionName` |
 | `get-custom-api-response-properties` | List response properties | `customApiId` | |
 | `create-custom-api-response-property` | Create a response property | `customApiId`, `uniqueName`, `name`, `displayName`, `type` | `description`, `logicalEntityName`, `isOptional`, `solutionName` |
 | `get-custom-api-request-parameters` | List request parameters | `customApiId` | |
@@ -349,11 +349,11 @@ set-environment-variable-value <definitionId> <value>   [--existing-value-id <id
 ```
 custom-apis                                [--include-managed] [--max <n>]
 custom-api <uniqueName>
-create-custom-api <uniqueName> <displayName>  [--binding-type <n>] [--bound-entity <name>] [--is-function] [--is-private] [--processing-type <n>] [--plugin-type-id <id>] [--plugin-type-name <name>] [--description <desc>] [--solution <name>]
+create-custom-api <uniqueName> <displayName>  [--binding-type <n>] [--bound-entity <name>] [--is-function] [--is-private] [--processing-type <n>] [--plugin-type-id <id>] [--plugin-type-name <name>] [--execute-privilege <name>] [--description <desc>] [--solution <name>]
 custom-api-response-properties <customApiId>
-create-custom-api-response-property <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--logical-entity <name>] [--solution <name>]
+create-custom-api-response-property <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--logical-entity <name>] [--name <name>] [--solution <name>]
 custom-api-request-parameters <customApiId>
-create-custom-api-request-parameter <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--logical-entity <name>] [--optional] [--solution <name>]
+create-custom-api-request-parameter <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--logical-entity <name>] [--optional] [--name <name>] [--solution <name>]
 ```
 
 #### Web Resources

@@ -33,6 +33,7 @@ export class CustomApiService {
       'isfunction',
       'isprivate',
       'allowedcustomprocessingsteptype',
+      'executeprivilegename',
       'ismanaged',
     ].join(',');
 
@@ -69,6 +70,7 @@ export class CustomApiService {
       'isfunction',
       'isprivate',
       'allowedcustomprocessingsteptype',
+      'executeprivilegename',
       'ismanaged',
     ].join(',');
 
@@ -77,6 +79,26 @@ export class CustomApiService {
     );
 
     return response.value.length > 0 ? response.value[0] : null;
+  }
+
+  /**
+   * The unique name of the Custom API with this id.
+   * @throws when no Custom API has that id
+   */
+  async getCustomApiUniqueName(customApiId: string): Promise<string> {
+    const api = await this.client.get<{ uniquename?: string }>(
+      `api/data/v9.2/customapis(${odataGuid(customApiId, 'customApiId')})?$select=uniquename`
+    );
+    if (!api?.uniquename) throw new Error(`No Custom API has the id ${customApiId}.`);
+    return api.uniquename;
+  }
+
+  /**
+   * The primary name Microsoft recommends for a request parameter or response property:
+   * `{custom API unique name}.{parameter unique name}`.
+   */
+  static memberName(apiUniqueName: string, memberUniqueName: string): string {
+    return `${apiUniqueName}.${memberUniqueName}`;
   }
 
   /**
@@ -91,6 +113,8 @@ export class CustomApiService {
    * @param options.isPrivate Whether this Custom API is private
    * @param options.allowedCustomProcessingStepType Processing step type (0=None, 1=AsyncOnly, 2=SyncAndAsync)
    * @param options.pluginTypeId Optional plugin type ID to bind
+   * @param options.executePrivilegeName Optional privilege a caller must hold to run the API (e.g.
+   *   prvCreateAccount); checked against the environment's privileges and stored with their spelling
    */
   async createCustomApi(options: {
     uniqueName: string;
@@ -103,8 +127,14 @@ export class CustomApiService {
     isPrivate: boolean;
     allowedCustomProcessingStepType: number;
     pluginTypeId?: string;
+    executePrivilegeName?: string;
     solutionName?: string;
-  }): Promise<{ customApiId: string }> {
+  }): Promise<{ customApiId: string; executePrivilegeName?: string }> {
+    // Checked first, so a misspelt name fails here rather than when the API is first called.
+    const executePrivilegeName = options.executePrivilegeName === undefined
+      ? undefined
+      : await this.getPrivilegeName(options.executePrivilegeName);
+
     const body: Record<string, unknown> = {
       uniquename: options.uniqueName,
       name: options.name,
@@ -127,6 +157,10 @@ export class CustomApiService {
       body['PluginTypeId@odata.bind'] = `/plugintypes(${odataGuid(options.pluginTypeId, 'pluginTypeId')})`;
     }
 
+    if (executePrivilegeName !== undefined) {
+      body.executeprivilegename = executePrivilegeName;
+    }
+
     const headers = options.solutionName ? { 'MSCRM.SolutionUniqueName': options.solutionName } : undefined;
     const result = await this.client.post<{ entityId?: string }>(
       'api/data/v9.2/customapis',
@@ -134,7 +168,7 @@ export class CustomApiService {
       headers,
     );
 
-    return { customApiId: result?.entityId ?? 'created' };
+    return { customApiId: result?.entityId ?? 'created', executePrivilegeName };
   }
 
   /**
@@ -276,5 +310,22 @@ export class CustomApiService {
     );
 
     return { requestParameterId: result?.entityId ?? 'created' };
+  }
+
+  /**
+   * The privilege's name as the environment spells it.
+   * @throws when no privilege has that name
+   */
+  private async getPrivilegeName(name: string): Promise<string> {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('The execute privilege name is empty.');
+    const response = await this.client.get<ApiCollectionResponse<{ privilegeid: string; name: string }>>(
+      `api/data/v9.2/privileges?$select=privilegeid,name&$filter=name eq ${odataString(trimmed)}&$top=1`
+    );
+    const privilege = response.value[0];
+    if (!privilege) {
+      throw new Error(`No privilege is named '${trimmed}'. Names look like prvCreateAccount or prvReadcontoso_project; \`privileges --entity <table>\` lists a table's.`);
+    }
+    return privilege.name;
   }
 }

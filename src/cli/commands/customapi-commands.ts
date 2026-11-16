@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
+import { CustomApiService } from '../../services/customapi-service.js';
 
 export function registerCustomApiCommands(program: Command, registry: EnvironmentRegistry): void {
   program
@@ -63,6 +64,7 @@ export function registerCustomApiCommands(program: Command, registry: Environmen
           `  Binding Type: ${result.bindingtype}`,
           `  Is Function: ${result.isfunction}`,
           `  Is Private: ${result.isprivate}`,
+          `  Execute Privilege: ${result.executeprivilegename ?? 'none'}`,
           `  Is Managed: ${result.ismanaged}`,
         ].join('\n'),
       }, ctx.environmentName);
@@ -78,6 +80,7 @@ export function registerCustomApiCommands(program: Command, registry: Environmen
     .option('--processing-type <n>', 'Processing step type: 0=None, 1=AsyncOnly, 2=SyncAndAsync', '0')
     .option('--plugin-type-id <id>', 'Plugin type ID to bind (runs at MainOperation)')
     .option('--plugin-type-name <name>', 'Plugin type class name to look up and bind (e.g. Contoso.Plugins.Accounts.SyncAccounts)')
+    .option('--execute-privilege <name>', 'Privilege a caller must hold to run the API (e.g. prvCreateAccount); checked against the environment')
     .option('--description <desc>', 'Description')
     .option('--solution <name>', 'Solution unique name to add the component to')
     .action(async (uniqueName: string, displayName: string, opts: {
@@ -88,6 +91,7 @@ export function registerCustomApiCommands(program: Command, registry: Environmen
       processingType: string;
       pluginTypeId?: string;
       pluginTypeName?: string;
+      executePrivilege?: string;
       description?: string;
       solution?: string;
     }, command: Command) => {
@@ -118,6 +122,7 @@ export function registerCustomApiCommands(program: Command, registry: Environmen
         isPrivate: opts.isPrivate ?? false,
         allowedCustomProcessingStepType: parseInt(opts.processingType, 10),
         pluginTypeId,
+        executePrivilegeName: opts.executePrivilege,
         solutionName: opts.solution,
       });
 
@@ -131,6 +136,8 @@ export function registerCustomApiCommands(program: Command, registry: Environmen
           `  Binding Type: ${opts.bindingType}`,
           `  Is Function: ${opts.isFunction ?? false}`,
           pluginTypeId ? `  Plugin Type: ${opts.pluginTypeName ?? pluginTypeId}` : '',
+          `  Execute Privilege: ${result.executePrivilegeName ?? 'none (anyone who can call the API)'}`,
+          opts.solution ? `  Solution: ${opts.solution}` : '',
           `  Custom API ID: ${result.customApiId}`,
         ].filter(Boolean).join('\n'),
       }, ctx.environmentName);
@@ -169,20 +176,23 @@ export function registerCustomApiCommands(program: Command, registry: Environmen
     .option('--description <desc>', 'Description')
     .option('--logical-entity <name>', 'Logical entity name (required for Entity, EntityCollection, EntityReference types)')
     .option('--optional', 'Mark this property as optional')
+    .option('--name <name>', "Primary name (default: '<API unique name>.<unique name>', as Microsoft recommends)")
     .option('--solution <name>', 'Solution unique name to add the component to')
     .action(async (customApiId: string, uniqueName: string, displayName: string, opts: {
       type: string;
       description?: string;
       logicalEntity?: string;
       optional?: boolean;
+      name?: string;
       solution?: string;
     }, command: Command) => {
       const ctx = registry.getContext(command.optsWithGlobals().env);
       const service = ctx.getCustomApiService();
+      const name = opts.name ?? CustomApiService.memberName(await service.getCustomApiUniqueName(customApiId), uniqueName);
       const result = await service.createCustomApiResponseProperty({
         customApiId,
         uniqueName,
-        name: uniqueName,
+        name,
         displayName,
         description: opts.description,
         type: parseInt(opts.type, 10),
@@ -197,6 +207,7 @@ export function registerCustomApiCommands(program: Command, registry: Environmen
         summary: [
           `Created response property:`,
           `  Unique Name: ${uniqueName}`,
+          `  Name: ${name}`,
           `  Display Name: ${displayName}`,
           `  Type: ${opts.type}`,
           `  Response Property ID: ${result.responsePropertyId}`,
@@ -237,20 +248,23 @@ export function registerCustomApiCommands(program: Command, registry: Environmen
     .option('--description <desc>', 'Description')
     .option('--logical-entity <name>', 'Logical entity name (required for Entity, EntityCollection, EntityReference types)')
     .option('--optional', 'Mark this parameter as optional')
+    .option('--name <name>', "Primary name (default: '<API unique name>.<unique name>', as Microsoft recommends)")
     .option('--solution <name>', 'Solution unique name to add the component to')
     .action(async (customApiId: string, uniqueName: string, displayName: string, opts: {
       type: string;
       description?: string;
       logicalEntity?: string;
       optional?: boolean;
+      name?: string;
       solution?: string;
     }, command: Command) => {
       const ctx = registry.getContext(command.optsWithGlobals().env);
       const service = ctx.getCustomApiService();
+      const name = opts.name ?? CustomApiService.memberName(await service.getCustomApiUniqueName(customApiId), uniqueName);
       const result = await service.createCustomApiRequestParameter({
         customApiId,
         uniqueName,
-        name: uniqueName,
+        name,
         displayName,
         description: opts.description,
         type: parseInt(opts.type, 10),
@@ -265,6 +279,7 @@ export function registerCustomApiCommands(program: Command, registry: Environmen
         summary: [
           `Created request parameter:`,
           `  Unique Name: ${uniqueName}`,
+          `  Name: ${name}`,
           `  Display Name: ${displayName}`,
           `  Type: ${opts.type}`,
           `  Request Parameter ID: ${result.requestParameterId}`,
