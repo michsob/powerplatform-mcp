@@ -442,6 +442,14 @@ remove-role-privileges <roleId>            --privileges <id,id,id>
 replace-role-privileges <roleId>           --privileges <spec> --yes
 ```
 
+#### Application Users
+```
+application-user <applicationId>           # the user of an app registration or managed identity, with its roles; exits 1 when there is none
+create-application-user <applicationId>    [--role <idOrName>]... [--bu <id>]
+```
+
+`create-application-user` takes the application (client) id; for a managed identity, `az ad sp show --id <principalId> --query appId`. Dataverse names the user from Microsoft Entra ID, so the service principal must be in the environment's tenant. A role is a role id or name; a role id from another business unit is mapped to that role's copy in the user's. Run again, it keeps the user and adds only the roles it lacks; it refuses a disabled user and does not move a user to another business unit.
+
 #### Service Endpoints
 ```
 service-endpoints                          [--max <n>]

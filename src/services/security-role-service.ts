@@ -9,6 +9,7 @@ import { PowerPlatformClient } from '../powerplatform-client.js';
 import { chunk, fetchCapped, odataAnyOf, odataGuid, odataString, type Truncation } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 import type { SolutionService } from './solution-service.js';
+import { getRootBusinessUnitId } from './business-units.js';
 
 const SYSTEM_ROLE_NAMES = [
   'System Administrator',
@@ -269,7 +270,7 @@ export class SecurityRoleService {
     description?: string;
     solutionUniqueName?: string;
   }): Promise<{ roleId: string }> {
-    const businessUnitId = options.businessUnitId ?? await this.getRootBusinessUnitId();
+    const businessUnitId = options.businessUnitId ?? await getRootBusinessUnitId(this.client);
 
     const body: Record<string, unknown> = {
       name: options.name,
@@ -334,7 +335,7 @@ export class SecurityRoleService {
     sourceRoleId: string,
     options: { newName?: string; targetBusinessUnitId?: string; solutionUniqueName?: string } = {}
   ): Promise<{ roleId: string }> {
-    const targetBusinessUnitId = options.targetBusinessUnitId ?? await this.getRootBusinessUnitId();
+    const targetBusinessUnitId = options.targetBusinessUnitId ?? await getRootBusinessUnitId(this.client);
 
     try {
       const headers = options.solutionUniqueName
@@ -464,16 +465,5 @@ export class SecurityRoleService {
     else if (mask & 1) depth = 'Basic';
 
     return depth ? { privilegeId, depth } : null;
-  }
-
-  private async getRootBusinessUnitId(): Promise<string> {
-    const result = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
-      `api/data/v9.2/businessunits?$select=businessunitid&$filter=_parentbusinessunitid_value eq null&$top=1`,
-    );
-    const bu = result.value[0];
-    if (!bu) {
-      throw new Error('Unable to locate the root business unit for this organization');
-    }
-    return String(bu.businessunitid);
   }
 }
