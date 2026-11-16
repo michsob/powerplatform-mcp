@@ -125,14 +125,16 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
         allowedCustomProcessingStepType: z.number().describe("Processing step type: 0=None, 1=AsyncOnly, 2=SyncAndAsync"),
         pluginTypeId: z.string().optional().describe("Plugin type ID to bind (runs at MainOperation)"),
         pluginTypeName: z.string().optional().describe("Plugin type class name to look up and bind (e.g. Contoso.Plugins.Accounts.SyncAccounts)"),
+        executePrivilegeName: z.string().optional().describe("Privilege a caller must hold to run the API (e.g. prvCreateAccount); checked against the environment"),
         solutionName: z.string().optional().describe("Solution unique name to add the component to"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         customApiId: z.string(),
+        executePrivilegeName: z.string().optional(),
       }),
     },
-    async ({ uniqueName, name, displayName, description, bindingType, boundEntityLogicalName, isFunction, isPrivate, allowedCustomProcessingStepType, pluginTypeId, pluginTypeName, solutionName, environment }) => {
+    async ({ uniqueName, name, displayName, description, bindingType, boundEntityLogicalName, isFunction, isPrivate, allowedCustomProcessingStepType, pluginTypeId, pluginTypeName, executePrivilegeName, solutionName, environment }) => {
       try {
         const ctx = registry.getContext(environment);
 
@@ -152,15 +154,16 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
         const result = await service.createCustomApi({
           uniqueName, name, displayName, description, bindingType,
           boundEntityLogicalName, isFunction, isPrivate,
-          allowedCustomProcessingStepType, pluginTypeId: resolvedPluginTypeId, solutionName,
+          allowedCustomProcessingStepType, pluginTypeId: resolvedPluginTypeId, executePrivilegeName, solutionName,
         });
 
         return {
-          structuredContent: { customApiId: result.customApiId },
+          structuredContent: { customApiId: result.customApiId, executePrivilegeName: result.executePrivilegeName },
           content: [
             {
               type: "text",
-              text: `Created Custom API '${uniqueName}' (ID: ${result.customApiId})`,
+              text: `Created Custom API '${uniqueName}' (ID: ${result.customApiId})` +
+                (result.executePrivilegeName ? `, callers need ${result.executePrivilegeName}` : ''),
             },
           ],
         };
