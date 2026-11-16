@@ -120,6 +120,42 @@ export function registerFormViewCommands(program: Command, registry: Environment
       }, ctx.environmentName);
     });
 
+  program
+    .command('add-form-web-resource-tab <entityName> <formId> <label> <webResource>')
+    .description('Add a tab showing an HTML web resource as the form\'s last tab (run again, the tab is replaced), then publish. The form joins a solution only with --solution.')
+    .option('--tab-name <name>', 'Tab name (default: tab_<label>)')
+    .option('--rows <n>', 'Height in form rows', '40')
+    .option('--no-pass-parameters', 'Do not pass the record\'s type and id to the web resource')
+    .option('--language-code <lcid>', 'Language code (LCID) of the labels (defaults to the base language)')
+    .option('--solution <name>', 'Solution unique name to add the form to (left out: the form joins no solution)')
+    .option('--dry-run', 'Build the formxml and save it to the cache without updating the form', false)
+    .action(async (entityName: string, formId: string, label: string, webResource: string, opts: {
+      tabName?: string; rows: string; passParameters: boolean; languageCode?: string; solution?: string; dryRun: boolean;
+    }, command: Command) => {
+      const rows = Number(opts.rows);
+      const languageCode = opts.languageCode === undefined ? undefined : Number(opts.languageCode);
+      if (languageCode !== undefined && (!Number.isInteger(languageCode) || languageCode <= 0)) {
+        throw new Error(`--language-code must be a positive whole number (an LCID such as 1033), not '${opts.languageCode}'.`);
+      }
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const result = await ctx.getFormViewService().addWebResourceTab(formId, entityName, {
+        label, webResource, tabName: opts.tabName, rows, passParameters: opts.passParameters, languageCode,
+        solutionName: opts.solution, dryRun: opts.dryRun,
+      });
+
+      outputResult({
+        fileName: `form-${formId}-tab-${result.tabName}${opts.dryRun ? '-dry-run' : ''}`,
+        data: result,
+        summary: [
+          result.saved
+            ? `${result.added ? 'Added' : 'Replaced'} tab '${label}' (${result.tabName}) on form '${result.formName}' (${formId}) and published '${entityName}'.`
+            : `Dry run — form '${result.formName}' (${formId}) not changed; the tab would be ${result.added ? 'added' : 'replaced'}.`,
+          `  Web resource: ${webResource} (${rows} rows${opts.passParameters ? ', record id passed' : ''})`,
+          opts.solution ? `  Solution: ${opts.solution}` : '  Solution: none (the form joins no solution)',
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
   // ─── VIEWS ─────────────────────────────────────────────────────────────────
 
   program

@@ -15,6 +15,7 @@ export { ServiceEndpointService } from './service-endpoint-service.js';
 export { CustomApiService } from './customapi-service.js';
 export { WebResourceService } from './webresource-service.js';
 export { ApplicationUserService } from './application-user-service.js';
+export { ModelDrivenAppService } from './model-driven-app-service.js';
 export { ApiCollectionResponse } from '../models/index.js';
 export { applyFlowFilters } from './flow-filter.js';
 export type { FlowFilterConfig, FilterPatterns, FlowFilterResult, FilterableFlow } from './flow-filter.js';

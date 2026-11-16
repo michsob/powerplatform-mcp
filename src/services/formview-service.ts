@@ -8,6 +8,49 @@ import type { FormAttributeInfo, FormLayoutResult, FormLayoutSpec } from './form
 /** Standard classid for a generic form control (works for text, money, picklist, lookup, etc.) */
 const STANDARD_CONTROL_CLASSID = '{4273EDBD-AC1D-40d3-9FB2-095C621B552D}';
 
+/** Classid of an HTML web resource on a form. */
+const WEB_RESOURCE_CONTROL_CLASSID = '{9FDF5F91-88B1-47f4-AD53-C11EFC01A01D}';
+
+export interface WebResourceTabOptions {
+  /** The tab's label. */
+  label: string;
+  /** The HTML web resource the tab shows. */
+  webResource: string;
+  /** The tab's name (default: tab_<label as an identifier>). */
+  tabName?: string;
+  /** The web resource's height in form rows (default 40). */
+  rows?: number;
+  /** Pass the record's type and id to the web resource (default true). */
+  passParameters?: boolean;
+  /** LCID of the labels (default: the organization's base language). */
+  languageCode?: number;
+  /** Add the form to this solution; without it the form joins no solution. */
+  solutionName?: string;
+  /** Build the formxml without saving it. */
+  dryRun?: boolean;
+}
+
+/** A tab with one section holding one HTML web resource, its label hidden, N rows high. */
+export function buildWebResourceTabXml(
+  tabName: string,
+  label: string,
+  webResource: string,
+  rows: number,
+  passParameters: boolean,
+  languageCode: number,
+  ids: { tab: string; section: string; cell: string },
+): string {
+  const text = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const labels = `<labels><label description="${text(label)}" languagecode="${languageCode}" /></labels>`;
+  return `<tab name="${tabName}" id="${ids.tab}" IsUserDefined="1" locklevel="0" showlabel="true" expanded="true" verticallayout="true">${labels}` +
+    '<columns><column width="100%"><sections>' +
+    `<section name="${tabName}_section" showlabel="false" showbar="false" locklevel="0" id="${ids.section}" IsUserDefined="1" layout="varwidth" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left">${labels}` +
+    `<rows><row><cell id="${ids.cell}" showlabel="false" colspan="1" auto="false" rowspan="${rows}">${labels}` +
+    `<control id="WebResource_${tabName}" classid="${WEB_RESOURCE_CONTROL_CLASSID}"><parameters><Url>${text(webResource)}</Url>` +
+    `<PassParameters>${passParameters}</PassParameters><Security>false</Security><Scrolling>auto</Scrolling><Border>false</Border></parameters></control>` +
+    '</cell></row>' + '<row />'.repeat(rows - 1) + '</rows></section></sections></column></columns></tab>';
+}
+
 const QUICK_FIND_QUERY_TYPE = 4;
 
 /** layoutxml for a view grid: one row of cells in display order. */
@@ -161,6 +204,61 @@ export class FormViewService {
     await this.publishEntity(entityLogicalName);
 
     return { removed: true };
+  }
+
+  /**
+   * Add a tab showing an HTML web resource as the form's last tab; run again, the tab (found by name) is replaced, so a
+   * change of height or web resource applies. The form is published; it joins a solution only when one is given.
+   */
+  async addWebResourceTab(
+    formId: string,
+    entityLogicalName: string,
+    options: WebResourceTabOptions,
+  ): Promise<{ added: boolean; tabName: string; formName: string; formxml: string; saved: boolean }> {
+    const label = options.label.trim();
+    if (!label) throw new Error('The tab needs a label.');
+    const tabName = options.tabName ?? `tab_${label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')}`;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(tabName)) throw new Error(`The tab name must be an identifier (got '${tabName}').`);
+    const rows = options.rows ?? 40;
+    if (!Number.isInteger(rows) || rows < 1 || rows > 200) throw new Error(`Rows must be a whole number from 1 to 200 (got ${rows}).`);
+
+    const form = await this.client.get<{ formxml: string; objecttypecode: string; name: string }>(
+      `api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})?$select=formxml,objecttypecode,name`,
+    );
+    if (form.objecttypecode !== entityLogicalName) {
+      throw new Error(`Form ${formId} belongs to '${form.objecttypecode}', not '${entityLogicalName}'.`);
+    }
+    const resources = await this.client.get<ApiCollectionResponse<{ name: string; webresourcetype: number }>>(
+      `api/data/v9.2/webresourceset?$select=name,webresourcetype&$filter=name eq ${odataString(options.webResource)}`,
+    );
+    const resource = (resources.value ?? []).find((w) => w.name.toLowerCase() === options.webResource.toLowerCase());
+    if (!resource) throw new Error(`Web resource '${options.webResource}' was not found (or is not published).`);
+    if (resource.webresourcetype !== 1) throw new Error(`Web resource '${options.webResource}' is not an HTML page (type ${resource.webresourcetype}).`);
+
+    const languageCode = options.languageCode ?? (await this.client.get<ApiCollectionResponse<{ languagecode: number }>>(
+      'api/data/v9.2/organizations?$select=languagecode')).value[0]?.languagecode ?? 1033;
+    let xml = form.formxml ?? '';
+    const existing = new RegExp(`<tab [^>]*name="${tabName}"[^>]*>[\\s\\S]*?</tab>`).exec(xml);
+    const id = (pattern: RegExp) => (existing ? pattern.exec(existing[0])?.[1] : undefined) ?? `{${randomUUID()}}`;
+    const tabXml = buildWebResourceTabXml(tabName, label, options.webResource, rows, options.passParameters ?? true, languageCode, {
+      tab: id(/<tab [^>]*id="([^"]+)"/),
+      section: id(/<section [^>]*id="([^"]+)"/),
+      cell: id(/<cell [^>]*id="([^"]+)"/),
+    });
+    if (existing) {
+      xml = xml.slice(0, existing.index) + tabXml + xml.slice(existing.index + existing[0].length);
+    } else {
+      const end = xml.indexOf('</tabs>');
+      if (end === -1) throw new Error('Could not find </tabs> in the formxml: the form has an unexpected structure.');
+      xml = xml.slice(0, end) + tabXml + xml.slice(end);
+    }
+
+    if (!options.dryRun) {
+      const headers = options.solutionName ? { 'MSCRM.SolutionUniqueName': options.solutionName } : undefined;
+      await this.client.patch(`api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})`, { formxml: xml }, headers);
+      await this.publishEntity(entityLogicalName);
+    }
+    return { added: !existing, tabName, formName: form.name, formxml: xml, saved: !options.dryRun };
   }
 
   // ─── VIEWS ─────────────────────────────────────────────────────────────────
