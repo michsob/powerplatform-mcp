@@ -178,19 +178,27 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
 
   program
     .command('create-entity-picklist-attribute <entityName> <schemaName> <displayName>')
-    .description('Create a local Picklist (Choice) attribute on a Dataverse entity')
-    .option('-o, --option <value:label>', 'Option in value:label format (repeatable)', (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
+    .description('Create a Picklist (Choice) attribute on a Dataverse entity: a local choice (--option), or a column on a global choice (--global-option-set)')
+    .option('-o, --option <value:label>', 'Option in value:label format (repeatable); not with --global-option-set', (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
+    .option('--global-option-set <name>', 'Use this existing global choice (option set) instead of local options')
+    .option('--default-value <value>', 'The option a new record gets (DefaultFormValue)')
     .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
     .option('--description <desc>', 'Description for the attribute')
+    .option('--language-code <lcid>', 'Language code (LCID) of the labels, e.g. 1033 for English', '1045')
     .option('--solution <name>', 'Solution unique name to add the component to')
     .action(async (entityName: string, schemaName: string, displayName: string, opts: {
       option: string[];
+      globalOptionSet?: string;
+      defaultValue?: string;
       requiredLevel: string;
       description?: string;
+      languageCode: string;
       solution?: string;
     }, command: Command) => {
-      if (opts.option.length === 0) {
-        console.error('Error: At least one --option value:label is required.');
+      if (opts.globalOptionSet ? opts.option.length > 0 : opts.option.length === 0) {
+        console.error(opts.globalOptionSet
+          ? 'Error: --option cannot be used with --global-option-set: the column takes the global choice\'s options.'
+          : 'Error: At least one --option value:label is required (or --global-option-set <name>).');
         process.exit(1);
       }
 
@@ -203,16 +211,31 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
         return { value: parseInt(o.substring(0, colonIdx), 10), label: o.substring(colonIdx + 1) };
       });
 
+      const languageCode = Number(opts.languageCode);
+      if (!Number.isInteger(languageCode) || languageCode <= 0) {
+        throw new Error(`--language-code must be a positive whole number (an LCID such as 1033), not '${opts.languageCode}'.`);
+      }
+      const defaultValue = opts.defaultValue === undefined ? undefined : Number(opts.defaultValue);
+      if (defaultValue !== undefined && !Number.isInteger(defaultValue)) {
+        throw new Error(`--default-value must be an option's whole-number value, not '${opts.defaultValue}'.`);
+      }
+      if (defaultValue !== undefined && options.length > 0 && !options.some(o => o.value === defaultValue)) {
+        throw new Error(`--default-value ${defaultValue} is not one of the --option values.`);
+      }
+
       const ctx = registry.getContext(command.optsWithGlobals().env);
       const service = ctx.getEntityService();
       const result = await service.createPicklistAttribute(
         entityName, schemaName, displayName, options,
         opts.requiredLevel as 'None' | 'ApplicationRequired' | 'SystemRequired',
         opts.description,
-        undefined, opts.solution,
+        languageCode, opts.solution,
+        { globalOptionSetName: opts.globalOptionSet, defaultValue },
       );
 
-      const optionList = options.map(o => `    ${o.value} = ${o.label}`).join('\n');
+      const choiceLine = opts.globalOptionSet
+        ? `  Global Choice: ${opts.globalOptionSet}`
+        : `  Options:\n${options.map(o => `    ${o.value} = ${o.label}`).join('\n')}`;
       outputResult({
         fileName: `${entityName}-create-picklist-${schemaName}`,
         data: result,
@@ -220,7 +243,8 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
           `Created picklist attribute on '${entityName}':`,
           `  Schema Name: ${schemaName}`,
           `  Display Name: ${displayName}`,
-          `  Options:\n${optionList}`,
+          choiceLine,
+          ...(defaultValue !== undefined ? [`  Default Value: ${defaultValue}`] : []),
           `  Required Level: ${opts.requiredLevel}`,
           `  Attribute ID: ${result.attributeId}`,
         ].join('\n'),

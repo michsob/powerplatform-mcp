@@ -351,16 +351,19 @@ export class EntityService {
   }
 
   /**
-   * Create a local Picklist (Choice / OptionSet) attribute on an entity.
+   * Create a Picklist (Choice / OptionSet) attribute on an entity: a local choice with its own options, or a column on
+   * an existing global choice (`choice.globalOptionSetName`, with no options of its own).
    *
    * @param entityName The logical name of the entity
    * @param schemaName Schema name for the new attribute
    * @param displayName Display name
-   * @param options Array of { value: number, label: string } defining the picklist options
+   * @param options Array of { value: number, label: string } defining a local choice's options; empty for a global choice
    * @param requiredLevel Required level
    * @param description Optional description
    * @param languageCode Language code for labels
    * @param solutionName Optional solution unique name
+   * @param choice.globalOptionSetName The global choice (option set) the column uses, by name
+   * @param choice.defaultValue The option a new record gets (DefaultFormValue); unset leaves the platform's default
    */
   async createPicklistAttribute(
     entityName: string,
@@ -371,7 +374,15 @@ export class EntityService {
     description?: string,
     languageCode: number = 1045,
     solutionName?: string,
+    choice: { globalOptionSetName?: string; defaultValue?: number } = {},
   ): Promise<{ attributeId: string }> {
+    const { globalOptionSetName, defaultValue } = choice;
+    if (globalOptionSetName ? options.length > 0 : options.length === 0) {
+      throw new Error(globalOptionSetName
+        ? 'A column on a global choice takes its options from the choice: pass no options of its own.'
+        : 'A local choice needs at least one option.');
+    }
+
     const mkLabel = (text: string) => ({
       '@odata.type': 'Microsoft.Dynamics.CRM.Label',
       LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: text, LanguageCode: languageCode }],
@@ -382,7 +393,19 @@ export class EntityService {
       SchemaName: schemaName,
       DisplayName: mkLabel(displayName),
       RequiredLevel: { Value: requiredLevel },
-      OptionSet: {
+    };
+
+    if (globalOptionSetName) {
+      // The bind takes the choice's MetadataId: Dataverse refuses a bind by name.
+      const globalChoice = await this.client.get<{ MetadataId?: string }>(
+        `api/data/v9.2/GlobalOptionSetDefinitions(Name=${odataString(globalOptionSetName)})?$select=MetadataId`,
+      );
+      if (!globalChoice?.MetadataId) {
+        throw new Error(`Global choice '${globalOptionSetName}' was not found.`);
+      }
+      body['GlobalOptionSet@odata.bind'] = `/GlobalOptionSetDefinitions(${globalChoice.MetadataId})`;
+    } else {
+      body.OptionSet = {
         '@odata.type': 'Microsoft.Dynamics.CRM.OptionSetMetadata',
         IsGlobal: false,
         OptionSetType: 'Picklist',
@@ -390,8 +413,12 @@ export class EntityService {
           Value: o.value,
           Label: mkLabel(o.label),
         })),
-      },
-    };
+      };
+    }
+
+    if (defaultValue !== undefined) {
+      body.DefaultFormValue = defaultValue;
+    }
 
     if (description) {
       body.Description = mkLabel(description);
