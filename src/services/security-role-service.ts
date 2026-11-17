@@ -418,7 +418,9 @@ export class SecurityRoleService {
 
   /**
    * Remove one or more privileges from a role. The bound RemovePrivilegeRole
-   * action removes a single privilege per call, so this loops.
+   * action removes a single privilege per call, so this loops. Its parameter is
+   * `Privilege`, a reference to the privilege record, not a `PrivilegeId` guid
+   * (the Web API refuses that with 0x80048d19).
    */
   async removeRolePrivileges(roleId: string, privilegeIds: string[]): Promise<void> {
     if (privilegeIds.length === 0) {
@@ -431,7 +433,7 @@ export class SecurityRoleService {
     for (const privilegeId of ids) {
       await this.client.post(
         `api/data/v9.2/roles(${role})/Microsoft.Dynamics.CRM.RemovePrivilegeRole`,
-        { PrivilegeId: privilegeId },
+        { Privilege: { '@odata.type': 'Microsoft.Dynamics.CRM.privilege', privilegeid: privilegeId } },
       );
     }
   }
