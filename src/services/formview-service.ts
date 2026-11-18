@@ -2,11 +2,30 @@ import { PowerPlatformClient } from '../powerplatform-client.js';
 import { odataGuid, odataInteger, odataString } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 import { randomUUID } from 'crypto';
-import { buildFormXml } from './form-layout.js';
+import { buildFormXml, controlClassId, escapeXml } from './form-layout.js';
 import type { FormAttributeInfo, FormLayoutResult, FormLayoutSpec } from './form-layout.js';
 
-/** Standard classid for a generic form control (works for text, money, picklist, lookup, etc.) */
-const STANDARD_CONTROL_CLASSID = '{4273EDBD-AC1D-40d3-9FB2-095C621B552D}';
+/** Where `addFormField` puts a field, whether it is locked, and its label. */
+export interface AddFormFieldOptions {
+  /** The logical name of a field on the form: the new row goes right after that field's row. */
+  after?: string;
+  /** Lock the field (the control's `disabled`). */
+  readOnly?: boolean;
+  /** The cell's label; the column's display name when left out. */
+  label?: string;
+}
+
+/**
+ * The `<row>` that holds the control bound to `attributeName`: its start and end in the formxml, or null when the field
+ * is not on the form. The match stays inside one row: a pattern that runs from the first `<row>` to the field would also
+ * take every row before it.
+ */
+export function findFieldRow(xml: string, attributeName: string): { start: number; end: number } | null {
+  const escaped = attributeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const rowRegex = new RegExp(`<row\\b[^>]*>(?:(?!<\\/row>)[\\s\\S])*?datafieldname="${escaped}"(?:(?!<\\/row>)[\\s\\S])*?<\\/row>`, 'i');
+  const match = rowRegex.exec(xml);
+  return match ? { start: match.index, end: match.index + match[0].length } : null;
+}
 
 /** Classid of an HTML web resource on a form. */
 const WEB_RESOURCE_CONTROL_CLASSID = '{9FDF5F91-88B1-47f4-AD53-C11EFC01A01D}';
@@ -138,34 +157,66 @@ export class FormViewService {
   }
 
   /**
-   * Add a field to a form. Appends a new row/cell/control at the end of the first
-   * section in the first tab. If the field is already present, this is a no-op.
+   * Add a field to a form, as a new row with one cell. It goes after the row of the field named in `options.after`, or
+   * at the end of the first section when there is none. The cell's label is `options.label`, or the column's display
+   * name; its control gets the classid for the column's type, as the form editor writes it; `options.readOnly` locks it.
+   * If the field is already present, this is a no-op.
    *
    * @param formId The systemform GUID
    * @param attributeName The logical name of the attribute to add
-   * @param entityLogicalName Used only for publishing after the change
+   * @param entityLogicalName The form's entity: its attribute's type and display name, and the publish afterwards
+   * @param options Where the field goes, whether it is locked, and its label
    */
-  async addFormField(formId: string, attributeName: string, entityLogicalName: string): Promise<{ added: boolean }> {
+  async addFormField(
+    formId: string,
+    attributeName: string,
+    entityLogicalName: string,
+    options: AddFormFieldOptions = {},
+  ): Promise<{ added: boolean }> {
     const form = await this.client.get<{ formxml: string }>(
       `api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})?$select=formxml`,
     );
     let xml = form.formxml ?? '';
 
     // Check if the field is already on the form.
-    if (xml.toLowerCase().includes(`datafieldname="${attributeName.toLowerCase()}"`)) {
+    if (findFieldRow(xml, attributeName)) {
       return { added: false };
     }
 
+    const attribute = await this.client.get<{
+      LogicalName: string;
+      AttributeType: string;
+      AttributeTypeName?: { Value: string };
+      DisplayName?: { UserLocalizedLabel?: { Label: string } | null };
+    }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityLogicalName)})/Attributes(LogicalName=${odataString(attributeName)})?$select=LogicalName,AttributeType,AttributeTypeName,DisplayName`,
+    );
+    const classId = controlClassId({
+      logicalName: attribute.LogicalName,
+      attributeType: attribute.AttributeType,
+      attributeTypeName: attribute.AttributeTypeName?.Value,
+    });
+    const label = options.label ?? attribute.DisplayName?.UserLocalizedLabel?.Label ?? attributeName;
+
     // Build the new row element.
     const cellId = `{${randomUUID()}}`;
-    const newRow = `<row><cell id="${cellId}" showlabel="true" locklevel="0"><labels><label description="${attributeName}" languagecode="1033" /></labels><control id="${attributeName}" classid="${STANDARD_CONTROL_CLASSID}" datafieldname="${attributeName}" /></cell></row>`;
+    const newRow = `<row><cell id="${cellId}" showlabel="true" locklevel="0"><labels><label description="${escapeXml(label)}" languagecode="1033" /></labels>`
+      + `<control id="${escapeXml(attributeName)}" classid="${classId}" datafieldname="${escapeXml(attributeName)}" disabled="${options.readOnly ? 'true' : 'false'}" /></cell></row>`;
 
-    // Insert before the closing </rows> of the first section.
-    const rowsCloseIdx = xml.indexOf('</rows>');
-    if (rowsCloseIdx === -1) {
-      throw new Error('Could not find </rows> in formxml — form may have an unexpected structure.');
+    if (options.after) {
+      const row = findFieldRow(xml, options.after);
+      if (!row) {
+        throw new Error(`'${options.after}' is not on form ${formId}, so '${attributeName}' cannot go after it.`);
+      }
+      xml = xml.substring(0, row.end) + newRow + xml.substring(row.end);
+    } else {
+      // Insert before the closing </rows> of the first section.
+      const rowsCloseIdx = xml.indexOf('</rows>');
+      if (rowsCloseIdx === -1) {
+        throw new Error('Could not find </rows> in formxml — form may have an unexpected structure.');
+      }
+      xml = xml.substring(0, rowsCloseIdx) + newRow + xml.substring(rowsCloseIdx);
     }
-    xml = xml.substring(0, rowsCloseIdx) + newRow + xml.substring(rowsCloseIdx);
 
     // Patch the form.
     await this.client.patch(`api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})`, { formxml: xml });
@@ -188,18 +239,14 @@ export class FormViewService {
     const form = await this.client.get<{ formxml: string }>(
       `api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})?$select=formxml`,
     );
-    let xml = form.formxml ?? '';
+    const xml = form.formxml ?? '';
 
-    // Build a regex that matches the <row> containing the target control.
-    // Use a non-greedy match between <row> and </row> to avoid over-matching.
-    const escaped = attributeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const rowRegex = new RegExp(`<row>[\\s\\S]*?datafieldname="${escaped}"[\\s\\S]*?<\\/row>`, 'i');
-    const newXml = xml.replace(rowRegex, '');
-
-    if (newXml === xml) {
+    const row = findFieldRow(xml, attributeName);
+    if (!row) {
       return { removed: false };
     }
 
+    const newXml = xml.substring(0, row.start) + xml.substring(row.end);
     await this.client.patch(`api/data/v9.2/systemforms(${odataGuid(formId, 'formId')})`, { formxml: newXml });
     await this.publishEntity(entityLogicalName);
 

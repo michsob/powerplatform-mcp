@@ -2,6 +2,40 @@ import { PowerPlatformClient } from '../powerplatform-client.js';
 import { odataString } from '../odata.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 
+/** The required levels `updateAttribute` sets. SystemRequired belongs to system attributes: Dataverse refuses it on a custom one. */
+export const UPDATABLE_REQUIRED_LEVELS: readonly string[] = ['None', 'Recommended', 'ApplicationRequired'];
+
+/** The attribute types that have a minimum and a maximum. */
+const NUMBER_ATTRIBUTE_TYPES: readonly string[] = ['Integer', 'Decimal', 'Double', 'Money'];
+
+/** What `updateAttribute` changes; a value left out stays as it is. */
+export interface AttributeChanges {
+  /** None, Recommended or ApplicationRequired (Business Required, which binds forms, not the API). */
+  requiredLevel?: string;
+  minValue?: number;
+  maxValue?: number;
+}
+
+/** An attribute's settings before and after `updateAttribute`. */
+export interface AttributeUpdateResult {
+  entityName: string;
+  attributeName: string;
+  attributeType?: string;
+  before: { requiredLevel?: string; minValue?: number; maxValue?: number };
+  after: { requiredLevel?: string; minValue?: number; maxValue?: number };
+  changed: boolean;
+}
+
+/** An attribute's definition as `EntityDefinitions(...)/Attributes(...)` returns it: the derived type, with its own properties. */
+type AttributeDefinition = Record<string, unknown> & {
+  MetadataId: string;
+  '@odata.type'?: string;
+  AttributeType?: string;
+  RequiredLevel?: { Value?: string; CanBeChanged?: boolean; ManagedPropertyLogicalName?: string };
+  MinValue?: number;
+  MaxValue?: number;
+};
+
 /**
  * Service for entity metadata operations.
  * Handles entity definitions, attributes, and relationships.
@@ -222,6 +256,78 @@ export class EntityService {
 
     await this.client.put(`api/data/v9.2/EntityDefinitions(${metadata.MetadataId})`, body, headers);
     return { changed: true };
+  }
+
+  /**
+   * Change an existing attribute's required level and, for a number (Integer, Decimal, Double, Money), its minimum and
+   * maximum. Like every metadata update this is a full-replace PUT: the attribute's definition is read, the asked values
+   * are changed, and it is put back with `MergeLabels`, so labels and every other setting stay. Publish afterwards.
+   * Dataverse does not check the rows already stored against a new minimum or maximum.
+   *
+   * @param entityName Logical name of the entity (e.g. 'contoso_project')
+   * @param attributeName Logical name of the attribute (e.g. 'contoso_points')
+   * @param changes The values to set; leave one out to keep it
+   * @param solutionName Optional solution to scope the metadata change to
+   * @returns The attribute's type, its values before and after, and whether anything changed (false when it was already as asked)
+   */
+  async updateAttribute(
+    entityName: string,
+    attributeName: string,
+    changes: AttributeChanges,
+    solutionName?: string,
+  ): Promise<AttributeUpdateResult> {
+    if (changes.requiredLevel === undefined && changes.minValue === undefined && changes.maxValue === undefined) {
+      throw new Error('Nothing to change: give a required level, a minimum or a maximum.');
+    }
+    if (changes.requiredLevel !== undefined && !UPDATABLE_REQUIRED_LEVELS.includes(changes.requiredLevel)) {
+      throw new Error(`The required level must be one of ${UPDATABLE_REQUIRED_LEVELS.join(', ')}, not '${changes.requiredLevel}'.`);
+    }
+    for (const [name, value] of [['minimum', changes.minValue], ['maximum', changes.maxValue]] as const) {
+      if (value !== undefined && !Number.isFinite(value)) throw new Error(`The ${name} must be a number.`);
+    }
+
+    const metadata = await this.client.get<AttributeDefinition>(
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes(LogicalName=${odataString(attributeName)})`,
+    );
+    const type = String(metadata['@odata.type'] ?? '').replace(/^#/, '');
+    const before = { requiredLevel: metadata.RequiredLevel?.Value, minValue: metadata.MinValue, maxValue: metadata.MaxValue };
+
+    const changesRange = changes.minValue !== undefined || changes.maxValue !== undefined;
+    if (changesRange && !NUMBER_ATTRIBUTE_TYPES.includes(metadata.AttributeType ?? '')) {
+      throw new Error(`'${attributeName}' is ${metadata.AttributeType ?? 'of an unknown type'}: only Integer, Decimal, Double and Money attributes have a minimum and a maximum.`);
+    }
+    if (changes.requiredLevel !== undefined && metadata.RequiredLevel?.CanBeChanged === false) {
+      throw new Error(`The required level of '${attributeName}' cannot be changed (CanBeChanged is false).`);
+    }
+
+    const after = {
+      requiredLevel: changes.requiredLevel ?? before.requiredLevel,
+      minValue: changes.minValue ?? before.minValue,
+      maxValue: changes.maxValue ?? before.maxValue,
+    };
+    if (after.minValue !== undefined && after.maxValue !== undefined && after.minValue > after.maxValue) {
+      throw new Error(`The minimum (${after.minValue}) is above the maximum (${after.maxValue}).`);
+    }
+
+    const changed = after.requiredLevel !== before.requiredLevel || after.minValue !== before.minValue || after.maxValue !== before.maxValue;
+    const result = { entityName, attributeName, attributeType: metadata.AttributeType, before, after, changed };
+    if (!changed) return result;
+
+    const body: Record<string, unknown> = { ...metadata, '@odata.type': type };
+    delete body['@odata.context'];
+    if (changes.requiredLevel !== undefined) body.RequiredLevel = { ...metadata.RequiredLevel, Value: changes.requiredLevel };
+    if (changes.minValue !== undefined) body.MinValue = changes.minValue;
+    if (changes.maxValue !== undefined) body.MaxValue = changes.maxValue;
+
+    const headers: Record<string, string> = { 'MSCRM.MergeLabels': 'true' };
+    if (solutionName) headers['MSCRM.SolutionUniqueName'] = solutionName;
+
+    await this.client.put(
+      `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes(${metadata.MetadataId})`,
+      body,
+      headers,
+    );
+    return result;
   }
 
   /**

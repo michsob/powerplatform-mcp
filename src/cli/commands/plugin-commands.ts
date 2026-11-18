@@ -310,6 +310,8 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
     .option('--description <desc>', 'Step description')
     .option('--configuration <config>', 'Unsecure configuration string')
     .option('--message-filter-id <id>', 'SDK message filter ID (entity filter)')
+    .option('--entity <logicalName>', 'The step\'s table: its filter for the message is looked up (instead of --message-filter-id)')
+    .option('--filtering-attributes <columns>', 'Update steps only: comma-separated columns whose change runs the step')
     .option('--solution <name>', 'Solution unique name to add the component to')
     .action(async (name: string, pluginTypeId: string, sdkMessageId: string, opts: {
       stage: string;
@@ -319,6 +321,8 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
       description?: string;
       configuration?: string;
       messageFilterId?: string;
+      entity?: string;
+      filteringAttributes?: string;
       solution?: string;
     }, command: Command) => {
       const ctx = registry.getContext(command.optsWithGlobals().env);
@@ -333,6 +337,8 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
         description: opts.description,
         configuration: opts.configuration,
         sdkMessageFilterId: opts.messageFilterId,
+        entityName: opts.entity,
+        filteringAttributes: opts.filteringAttributes?.split(','),
         solutionName: opts.solution,
       });
 
@@ -347,6 +353,8 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
           `  Name: ${name}`,
           `  Stage: ${stageLabel} (${stage})`,
           `  Mode: ${modeName} (${mode})`,
+          ...(opts.entity ? [`  Table: ${opts.entity} (filter ${result.sdkMessageFilterId})`] : []),
+          ...(result.filteringAttributes ? [`  Filtering attributes: ${result.filteringAttributes}`] : []),
           `  Step ID: ${result.stepId}`,
         ].join('\n'),
       }, ctx.environmentName);

@@ -340,6 +340,8 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
         description: z.string().optional().describe("Step description"),
         configuration: z.string().optional().describe("Unsecure configuration string"),
         sdkMessageFilterId: z.string().optional().describe("GUID of the SDK message filter (entity filter)"),
+        entityName: z.string().optional().describe("Logical name of the step's table: its filter for the message is looked up (instead of sdkMessageFilterId)"),
+        filteringAttributes: z.array(z.string()).optional().describe("Update steps only: the columns whose change runs the step"),
         solutionName: z.string().optional().describe("Solution unique name to add the component to"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
@@ -348,13 +350,13 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
         stepId: z.string(),
       }),
     },
-    async ({ name, pluginTypeId, sdkMessageId, stage, mode, rank, supportedDeployment, description, configuration, sdkMessageFilterId, solutionName, environment }) => {
+    async ({ name, pluginTypeId, sdkMessageId, stage, mode, rank, supportedDeployment, description, configuration, sdkMessageFilterId, entityName, filteringAttributes, solutionName, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getPluginService();
         const result = await service.createPluginStep({
           name, pluginTypeId, sdkMessageId, stage, mode,
-          rank, supportedDeployment, description, configuration, sdkMessageFilterId, solutionName,
+          rank, supportedDeployment, description, configuration, sdkMessageFilterId, entityName, filteringAttributes, solutionName,
         });
 
         const stageLabel = stageName(stage);
