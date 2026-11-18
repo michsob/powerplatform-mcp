@@ -57,17 +57,29 @@ export function registerFormViewCommands(program: Command, registry: Environment
 
   program
     .command('add-form-field <entityName> <formId> <attributeName>')
-    .description('Add a field to a Dataverse form')
-    .action(async (entityName: string, formId: string, attributeName: string, _opts: unknown, command: Command) => {
+    .description('Add a field to a Dataverse form: after another field\'s row with --after, else at the end of the first section. The label defaults to the column\'s display name and the control fits its type.')
+    .option('--after <attributeName>', 'A field on the form: the new field goes on the row after it')
+    .option('--read-only', 'Lock the field on the form', false)
+    .option('--label <text>', 'The label (default: the column\'s display name)')
+    .action(async (entityName: string, formId: string, attributeName: string, opts: {
+      after?: string;
+      readOnly: boolean;
+      label?: string;
+    }, command: Command) => {
       const ctx = registry.getContext(command.optsWithGlobals().env);
       const service = ctx.getFormViewService();
-      const result = await service.addFormField(formId, attributeName, entityName);
+      const result = await service.addFormField(formId, attributeName, entityName, {
+        after: opts.after,
+        readOnly: opts.readOnly,
+        label: opts.label,
+      });
 
+      const where = opts.after ? ` after '${opts.after}'` : '';
       outputResult({
         fileName: `form-${formId}-add-${attributeName}`,
         data: result,
         summary: result.added
-          ? `Added '${attributeName}' to form ${formId} and published '${entityName}'.`
+          ? `Added '${attributeName}'${opts.readOnly ? ', locked,' : ''} to form ${formId}${where} and published '${entityName}'.`
           : `'${attributeName}' is already on the form — no change.`,
       }, ctx.environmentName);
     });

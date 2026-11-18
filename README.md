@@ -105,7 +105,7 @@ List tools stop at `maxRecords` and say so: `hasMore` is true when more rows mat
 | `get-all-plugin-steps` | All SDK message processing steps | | `includeDisabled`, `maxRecords` |
 | `get-plugin-type` | Look up a plugin type by class name | `typeName` | |
 | `get-sdk-message` | Look up an SDK message by name | `messageName` | |
-| `create-plugin-step` | Register a plugin step | `name`, `pluginTypeId`, `sdkMessageId`, `stage`, `mode` | `rank`, `supportedDeployment`, `description`, `configuration`, `sdkMessageFilterId`, `solutionName` |
+| `create-plugin-step` | Register a plugin step | `name`, `pluginTypeId`, `sdkMessageId`, `stage`, `mode` | `rank`, `supportedDeployment`, `description`, `configuration`, `sdkMessageFilterId` or `entityName`, `filteringAttributes`, `solutionName` |
 
 #### Flows (Power Automate)
 
@@ -257,6 +257,7 @@ create-entity-lookup <referencingEntity> <referencedEntity> <relationshipSchemaN
 create-entity-alternate-key <entityName> <schemaName> <displayName> <keyAttributes...>  [--language-code <lcid>] [--solution <name>]
 delete-entity-alternate-key <entityName> <keyName>
 set-entity-change-tracking <entityName> <on|off>  [--solution <name>] [--no-publish]
+update-entity-attribute <entityName> <attributeName>  [--required-level <None|Recommended|ApplicationRequired>] [--min <n>] [--max <n>] [--solution <name>] [--no-publish]   # min/max on Integer, Decimal, Double, Money; labels and other settings stay
 delete-entity-attribute <entityName> <attributeName>
 ```
 
@@ -283,7 +284,7 @@ all-plugin-steps                           [--include-disabled] [--max <n>]
 sdk-message <messageName>
 register-plugin-package <filePath>         --name <name> --unique-name <uniqueName> [--pkg-version <version>] [--solution <name>]
 update-plugin-package <filePath>           --plugin-package-id <id> [--pkg-version <version>]
-create-plugin-step <name> <pluginTypeId> <sdkMessageId>  [--stage <n>] [--mode <n>] [--rank <n>] [--supported-deployment <n>] [--description <desc>] [--configuration <cfg>] [--message-filter-id <id>] [--solution <name>]
+create-plugin-step <name> <pluginTypeId> <sdkMessageId>  [--stage <n>] [--mode <n>] [--rank <n>] [--supported-deployment <n>] [--description <desc>] [--configuration <cfg>] [--message-filter-id <id> | --entity <logicalName>] [--filtering-attributes <csv>] [--solution <name>]   # --entity looks up the table's filter; filtering attributes on Update steps only
 create-plugin-step-image <stepId>          [--name <name>] [--entity-alias <alias>] [--image-type <0|1|2>] [--message-property-name <name>] [--attributes <csv>]
 ```
 
@@ -369,7 +370,7 @@ set-entity-icon <entityName> <svgFilePath>  [--solution <name>] [--web-resource-
 ```
 entity-forms <entityName>                  [--type <n>]
 entity-form-fields <formId>
-add-form-field <entityName> <formId> <attributeName>
+add-form-field <entityName> <formId> <attributeName>  [--after <attributeName>] [--read-only] [--label <text>]   # label: the column's display name; control: its type's
 remove-form-field <entityName> <formId> <attributeName>
 add-form-web-resource-tab <entityName> <formId> <label> <webResource>  [--tab-name <name>] [--rows <n>] [--no-pass-parameters] [--language-code <lcid>] [--solution <name>] [--dry-run]   # last tab, one HTML web resource; run again it replaces the tab; joins a solution only with --solution
 set-form-layout <entityName> <formId> <layoutFile>       [--dry-run]

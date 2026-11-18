@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
+import type { AttributeUpdateResult } from '../../services/entity-service.js';
 
 /** `<prefix>_Name` for an entity schema name such as `contoso_Project`; the prefix must match the publisher's. */
 export function defaultPrimaryNameSchema(entitySchemaName: string): string {
@@ -711,6 +712,50 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
         summary: changed
           ? `Change tracking turned ${normalised} for '${entityName}'${opts.publish !== false ? ' and published' : ' (not published)'}.`
           : `Change tracking was already ${normalised} for '${entityName}'; nothing changed.`,
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('update-entity-attribute <entityName> <attributeName>')
+    .description('Change an existing attribute\'s required level, and a number attribute\'s minimum and maximum, then publish the entity. Labels and every other setting stay.')
+    .option('--required-level <level>', 'None, Recommended or ApplicationRequired (Business Required: binds forms, not the API)')
+    .option('--min <n>', 'Minimum allowed value (Integer, Decimal, Double, Money)')
+    .option('--max <n>', 'Maximum allowed value (Integer, Decimal, Double, Money)')
+    .option('--solution <name>', 'Solution unique name to scope the metadata change to')
+    .option('--no-publish', 'Skip publishing the entity afterwards')
+    .action(async (entityName: string, attributeName: string, opts: {
+      requiredLevel?: string;
+      min?: string;
+      max?: string;
+      solution?: string;
+      publish: boolean;
+    }, command: Command) => {
+      const number = (value: string | undefined, name: string) => {
+        if (value === undefined) return undefined;
+        const parsed = Number(value);
+        if (value.trim() === '' || !Number.isFinite(parsed)) throw new Error(`--${name} must be a number, not '${value}'.`);
+        return parsed;
+      };
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const result = await ctx.getEntityService().updateAttribute(entityName, attributeName, {
+        requiredLevel: opts.requiredLevel,
+        minValue: number(opts.min, 'min'),
+        maxValue: number(opts.max, 'max'),
+      }, opts.solution);
+      const published = result.changed && opts.publish !== false;
+      if (published) {
+        await ctx.getSolutionService().publishCustomizations(entityName);
+      }
+
+      const describe = (s: AttributeUpdateResult['after']) =>
+        [s.requiredLevel, s.minValue !== undefined || s.maxValue !== undefined ? `${s.minValue ?? '…'} to ${s.maxValue ?? '…'}` : undefined]
+          .filter(Boolean).join(', ');
+      outputResult({
+        fileName: `${entityName}-update-attribute-${attributeName}`,
+        data: { ...result, published },
+        summary: result.changed
+          ? `Updated '${entityName}.${attributeName}' (${result.attributeType}): ${describe(result.before)} → ${describe(result.after)}${published ? ', published' : ' (not published)'}.`
+          : `'${entityName}.${attributeName}' was already ${describe(result.after)}; nothing changed.`,
       }, ctx.environmentName);
     });
 

@@ -585,6 +585,10 @@ export class PluginService {
 
   /**
    * Register a plugin step (SDK message processing step).
+   *
+   * The step's table is either `sdkMessageFilterId` or `entityName`, whose filter for the message is looked up; a step
+   * with neither runs for every table. `filteringAttributes` (Update steps only) lists the columns whose change runs the
+   * step: an update that sets none of them skips it. They are stored as Dataverse does, lower case and comma-separated.
    * @param options Step configuration
    */
   async createPluginStep(options: {
@@ -598,12 +602,43 @@ export class PluginService {
     description?: string;
     configuration?: string;
     sdkMessageFilterId?: string;
+    /** Logical name of the step's table: its message filter is looked up. Leave out with `sdkMessageFilterId`. */
+    entityName?: string;
+    /** Columns whose change runs an Update step. */
+    filteringAttributes?: string[];
     solutionName?: string;
-  }): Promise<{ stepId: string }> {
+  }): Promise<{ stepId: string; sdkMessageFilterId?: string; filteringAttributes?: string }> {
+    const messageId = odataGuid(options.sdkMessageId, 'sdkMessageId');
+    if (options.entityName && options.sdkMessageFilterId) {
+      throw new Error('Give the step\'s table either as an entity name or as a message filter id, not both.');
+    }
+
+    let filteringAttributes: string | undefined;
+    if (options.filteringAttributes) {
+      const columns = [...new Set(options.filteringAttributes.map(c => c.trim().toLowerCase()).filter(c => c.length > 0))];
+      if (columns.length === 0) throw new Error('The filtering attributes are empty.');
+      const message = await this.client.get<{ name?: string }>(`api/data/v9.2/sdkmessages(${messageId})?$select=name`);
+      if (message.name !== 'Update') {
+        throw new Error(`Filtering attributes apply to Update steps only; this step is on ${message.name ?? 'an unknown message'}.`);
+      }
+      filteringAttributes = columns.join(',');
+    }
+
+    let sdkMessageFilterId = options.sdkMessageFilterId;
+    if (options.entityName) {
+      const filters = await this.client.get<ApiCollectionResponse<{ sdkmessagefilterid: string }>>(
+        `api/data/v9.2/sdkmessagefilters?$filter=_sdkmessageid_value eq ${messageId} and primaryobjecttypecode eq ${odataString(options.entityName)}&$select=sdkmessagefilterid&$top=1`,
+      );
+      sdkMessageFilterId = filters.value?.[0]?.sdkmessagefilterid;
+      if (!sdkMessageFilterId) {
+        throw new Error(`The message ${options.sdkMessageId} has no filter for '${options.entityName}': it cannot run on that table.`);
+      }
+    }
+
     const body: Record<string, unknown> = {
       name: options.name,
       'plugintypeid@odata.bind': `/plugintypes(${odataGuid(options.pluginTypeId, 'pluginTypeId')})`,
-      'sdkmessageid@odata.bind': `/sdkmessages(${odataGuid(options.sdkMessageId, 'sdkMessageId')})`,
+      'sdkmessageid@odata.bind': `/sdkmessages(${messageId})`,
       stage: options.stage,
       mode: options.mode,
       rank: options.rank ?? 1,
@@ -612,8 +647,9 @@ export class PluginService {
 
     if (options.description) body.description = options.description;
     if (options.configuration) body.configuration = options.configuration;
-    if (options.sdkMessageFilterId) {
-      body['sdkmessagefilterid@odata.bind'] = `/sdkmessagefilters(${odataGuid(options.sdkMessageFilterId, 'sdkMessageFilterId')})`;
+    if (filteringAttributes) body.filteringattributes = filteringAttributes;
+    if (sdkMessageFilterId) {
+      body['sdkmessagefilterid@odata.bind'] = `/sdkmessagefilters(${odataGuid(sdkMessageFilterId, 'sdkMessageFilterId')})`;
     }
 
     const headers = options.solutionName ? { 'MSCRM.SolutionUniqueName': options.solutionName } : undefined;
@@ -623,7 +659,7 @@ export class PluginService {
       headers,
     );
 
-    return { stepId: result?.entityId ?? 'created' };
+    return { stepId: result?.entityId ?? 'created', sdkMessageFilterId, filteringAttributes };
   }
 
   /**
