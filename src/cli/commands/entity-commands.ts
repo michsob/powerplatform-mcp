@@ -717,16 +717,22 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
 
   program
     .command('update-entity-attribute <entityName> <attributeName>')
-    .description('Change an existing attribute\'s required level, and a number attribute\'s minimum and maximum, then publish the entity. Labels and every other setting stay.')
+    .description('Change an existing attribute\'s required level, display name and description, and a number attribute\'s minimum and maximum, then publish the entity. Every other setting, and the labels in other languages, stay.')
     .option('--required-level <level>', 'None, Recommended or ApplicationRequired (Business Required: binds forms, not the API)')
     .option('--min <n>', 'Minimum allowed value (Integer, Decimal, Double, Money)')
     .option('--max <n>', 'Maximum allowed value (Integer, Decimal, Double, Money)')
+    .option('--display-name <text>', 'Display name, in --language-code')
+    .option('--description <text>', 'Description (the column\'s tooltip), in --language-code')
+    .option('--language-code <lcid>', 'Language of --display-name and --description (default: the organization\'s base language)')
     .option('--solution <name>', 'Solution unique name to scope the metadata change to')
     .option('--no-publish', 'Skip publishing the entity afterwards')
     .action(async (entityName: string, attributeName: string, opts: {
       requiredLevel?: string;
       min?: string;
       max?: string;
+      displayName?: string;
+      description?: string;
+      languageCode?: string;
       solution?: string;
       publish: boolean;
     }, command: Command) => {
@@ -741,6 +747,9 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
         requiredLevel: opts.requiredLevel,
         minValue: number(opts.min, 'min'),
         maxValue: number(opts.max, 'max'),
+        displayName: opts.displayName,
+        description: opts.description,
+        languageCode: number(opts.languageCode, 'language-code'),
       }, opts.solution);
       const published = result.changed && opts.publish !== false;
       if (published) {
@@ -748,8 +757,12 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
       }
 
       const describe = (s: AttributeUpdateResult['after']) =>
-        [s.requiredLevel, s.minValue !== undefined || s.maxValue !== undefined ? `${s.minValue ?? '…'} to ${s.maxValue ?? '…'}` : undefined]
-          .filter(Boolean).join(', ');
+        [
+          s.requiredLevel,
+          s.minValue !== undefined || s.maxValue !== undefined ? `${s.minValue ?? '…'} to ${s.maxValue ?? '…'}` : undefined,
+          'displayName' in s ? `display name ${s.displayName === undefined ? '(none)' : `'${s.displayName}'`}` : undefined,
+          'description' in s ? `description ${s.description === undefined ? '(none)' : `'${s.description}'`}` : undefined,
+        ].filter(Boolean).join(', ');
       outputResult({
         fileName: `${entityName}-update-attribute-${attributeName}`,
         data: { ...result, published },
