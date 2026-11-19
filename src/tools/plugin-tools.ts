@@ -385,6 +385,106 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
     }
   );
 
+  // Update Plugin Step
+  server.registerTool(
+    "update-plugin-step",
+    {
+      title: "Update Plugin Step",
+      description: "Change a plugin step in place (it keeps its id, images and solutions); only the settings that differ are written",
+      inputSchema: {
+        stepId: z.string().describe("GUID of the step (sdkmessageprocessingstepid)"),
+        name: z.string().optional().describe("Step name"),
+        description: z.string().optional().describe("Step description"),
+        stage: z.number().optional().describe("Execution stage: 10=PreValidation, 20=PreOperation, 40=PostOperation"),
+        mode: z.number().optional().describe("Execution mode: 0=Synchronous, 1=Asynchronous (post-operation only)"),
+        rank: z.number().optional().describe("Execution order"),
+        configuration: z.string().optional().describe("Unsecure configuration string"),
+        filteringAttributes: z.array(z.string()).nullable().optional().describe("Update steps only: the columns whose change runs the step, replacing the list; null clears it, so any column runs the step"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        stepId: z.string(),
+        changes: z.array(z.string()),
+        before: z.any(),
+        after: z.any(),
+      }),
+    },
+    async ({ stepId, name, description, stage, mode, rank, configuration, filteringAttributes, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const result = await ctx.getPluginService().updatePluginStep(stepId, {
+          name, description, stage, mode, rank, configuration, filteringAttributes,
+        });
+
+        return {
+          structuredContent: { stepId: result.stepId, changes: result.changes, before: result.before, after: result.after },
+          content: [
+            {
+              type: "text",
+              text: result.changes.length > 0
+                ? `Updated plugin step '${result.after.name}': ${result.changes.join(', ')}.\n\n${JSON.stringify({ before: result.before, after: result.after }, null, 2)}`
+                : `Plugin step '${result.after.name}' was already as asked; nothing changed.`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error updating plugin step:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to update plugin step: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  // Delete Plugin Step
+  server.registerTool(
+    "delete-plugin-step",
+    {
+      title: "Delete Plugin Step",
+      description: "Delete (unregister) a plugin step; Dataverse deletes its images with it. A managed step is refused.",
+      inputSchema: {
+        stepId: z.string().describe("GUID of the step (sdkmessageprocessingstepid)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        stepId: z.string(),
+        name: z.string(),
+        images: z.array(z.string()),
+      }),
+    },
+    async ({ stepId, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const result = await ctx.getPluginService().deletePluginStep(stepId);
+
+        return {
+          structuredContent: { stepId: result.stepId, name: result.name, images: result.images },
+          content: [
+            {
+              type: "text",
+              text: `Deleted plugin step '${result.name}' (${[result.messageName, result.entityName].filter(Boolean).join(' of ')}, ${stageName(result.stage)})${result.images.length > 0 ? ` and its images: ${result.images.join(', ')}` : ''}.`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error deleting plugin step:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to delete plugin step: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
   // Get All Plugin Steps
   server.registerTool(
     "get-all-plugin-steps",

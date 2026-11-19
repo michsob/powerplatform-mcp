@@ -43,6 +43,82 @@ export interface PluginStepInventoryResult extends Truncation {
   steps: PluginStepInventoryEntry[];
 }
 
+/** A step's settings that `updatePluginStep` can change, as Dataverse stores them. */
+export interface PluginStepSettings {
+  name: string;
+  description: string | null;
+  stage: number;
+  mode: number;
+  rank: number;
+  configuration: string | null;
+  /** Lower case and comma-separated; null runs an Update step on a change of any column. */
+  filteringAttributes: string | null;
+}
+
+/** What `updatePluginStep` changes; a value left out stays as it is. */
+export interface PluginStepChanges {
+  name?: string;
+  description?: string;
+  stage?: number;
+  mode?: number;
+  rank?: number;
+  configuration?: string;
+  /** Columns whose change runs an Update step; null clears them, so a change of any column runs it. */
+  filteringAttributes?: string[] | null;
+}
+
+/** A step before and after `updatePluginStep`. */
+export interface PluginStepUpdateResult {
+  stepId: string;
+  messageName: string | null;
+  entityName: string | null;
+  before: PluginStepSettings;
+  after: PluginStepSettings;
+  /** The settings whose value changed; empty when the step was already as asked, and then nothing was written. */
+  changes: (keyof PluginStepSettings)[];
+}
+
+/** A step `deletePluginStep` deleted, with the images that went with it. */
+export interface PluginStepDeleteResult {
+  stepId: string;
+  name: string;
+  messageName: string | null;
+  entityName: string | null;
+  stage: number;
+  images: string[];
+}
+
+/** A step as `updatePluginStep` and `deletePluginStep` read it. */
+interface StepRow {
+  name: string;
+  description?: string | null;
+  stage: number;
+  mode: number;
+  rank: number;
+  configuration?: string | null;
+  filteringattributes?: string | null;
+  ismanaged?: boolean;
+  iscustomizable?: { Value?: boolean };
+  sdkmessageid?: { name?: string } | null;
+  sdkmessagefilterid?: { primaryobjecttypecode?: string } | null;
+}
+
+/** The stages a registered step can run in. 30 is a Custom API's main operation, which is not a step's to choose. */
+const STEP_STAGES: readonly number[] = [10, 20, 40];
+
+/** Filtering attributes as Dataverse stores them: trimmed, lower case, once each, in the order given. */
+function filteringAttributeList(columns: string[]): string {
+  const list = [...new Set(columns.map(c => c.trim().toLowerCase()).filter(c => c.length > 0))];
+  if (list.length === 0) throw new Error('The filtering attributes are empty.');
+  return list.join(',');
+}
+
+/** The same columns, whatever their order or case. */
+function sameColumns(a: string | null, b: string | null): boolean {
+  const set = (value: string | null) => (value ?? '').split(',').map(c => c.trim().toLowerCase()).filter(Boolean).sort().join(',');
+  return set(a) === set(b);
+}
+
 export class PluginService {
   constructor(private client: PowerPlatformClient) {}
 
@@ -615,13 +691,11 @@ export class PluginService {
 
     let filteringAttributes: string | undefined;
     if (options.filteringAttributes) {
-      const columns = [...new Set(options.filteringAttributes.map(c => c.trim().toLowerCase()).filter(c => c.length > 0))];
-      if (columns.length === 0) throw new Error('The filtering attributes are empty.');
+      filteringAttributes = filteringAttributeList(options.filteringAttributes);
       const message = await this.client.get<{ name?: string }>(`api/data/v9.2/sdkmessages(${messageId})?$select=name`);
       if (message.name !== 'Update') {
         throw new Error(`Filtering attributes apply to Update steps only; this step is on ${message.name ?? 'an unknown message'}.`);
       }
-      filteringAttributes = columns.join(',');
     }
 
     let sdkMessageFilterId = options.sdkMessageFilterId;
@@ -660,6 +734,120 @@ export class PluginService {
     );
 
     return { stepId: result?.entityId ?? 'created', sdkMessageFilterId, filteringAttributes };
+  }
+
+  /**
+   * Change a registered step in place: its name, description, stage, mode, rank, unsecure configuration and filtering
+   * attributes. The step is read first; only the settings that differ are sent, in one PATCH, and nothing is written
+   * when it is already as asked. Filtering attributes are compared as a set, so a new order or case is no change.
+   * It keeps its id, its images and its place in its solutions, so the change is never a moment without the step,
+   * as deleting and re-creating it would be.
+   *
+   * Refused, before anything is written: filtering attributes on a step that is not on Update; a stage other than 10,
+   * 20 or 40; a mode other than 0 or 1; an asynchronous step that does not run post-operation (stage 40), counting the
+   * settings it keeps; and a step that is not customizable.
+   *
+   * @param stepId The step's id (sdkmessageprocessingstepid)
+   * @param changes The settings to change; leave one out to keep it. `filteringAttributes: null` clears them.
+   */
+  async updatePluginStep(stepId: string, changes: PluginStepChanges): Promise<PluginStepUpdateResult> {
+    const id = odataGuid(stepId, 'stepId');
+    if (Object.values(changes).every((value) => value === undefined)) {
+      throw new Error('Nothing to change: give a name, description, stage, mode, rank, configuration or filtering attributes.');
+    }
+    if (changes.name !== undefined && changes.name.trim() === '') throw new Error('The name is empty.');
+    if (changes.stage !== undefined && !STEP_STAGES.includes(changes.stage)) {
+      throw new Error(`The stage must be 10 (PreValidation), 20 (PreOperation) or 40 (PostOperation), not ${changes.stage}.`);
+    }
+    if (changes.mode !== undefined && changes.mode !== 0 && changes.mode !== 1) {
+      throw new Error(`The mode must be 0 (Synchronous) or 1 (Asynchronous), not ${changes.mode}.`);
+    }
+    if (changes.rank !== undefined && !Number.isInteger(changes.rank)) throw new Error(`The rank must be a whole number, not ${changes.rank}.`);
+    const filteringAttributes = changes.filteringAttributes === undefined
+      ? undefined
+      : changes.filteringAttributes === null ? null : filteringAttributeList(changes.filteringAttributes);
+
+    const step = await this.readStep(id);
+    const messageName = step.sdkmessageid?.name ?? null;
+    const entityName = step.sdkmessagefilterid?.primaryobjecttypecode ?? null;
+    if (step.iscustomizable?.Value === false) {
+      throw new Error(`The step '${step.name}' is ${step.ismanaged ? 'managed and ' : ''}not customizable: it cannot be changed here.`);
+    }
+    if (filteringAttributes && messageName !== 'Update') {
+      throw new Error(`Filtering attributes apply to Update steps only; this step is on ${messageName ?? 'an unknown message'}.`);
+    }
+
+    const before: PluginStepSettings = {
+      name: step.name,
+      description: step.description ?? null,
+      stage: step.stage,
+      mode: step.mode,
+      rank: step.rank,
+      configuration: step.configuration ?? null,
+      filteringAttributes: step.filteringattributes || null,
+    };
+    const after: PluginStepSettings = {
+      name: changes.name ?? before.name,
+      description: changes.description ?? before.description,
+      stage: changes.stage ?? before.stage,
+      mode: changes.mode ?? before.mode,
+      rank: changes.rank ?? before.rank,
+      configuration: changes.configuration ?? before.configuration,
+      filteringAttributes: filteringAttributes === undefined || sameColumns(filteringAttributes, before.filteringAttributes)
+        ? before.filteringAttributes
+        : filteringAttributes,
+    };
+    if (after.mode === 1 && after.stage !== 40) {
+      throw new Error(`An asynchronous step must run post-operation (stage 40); this one would run in stage ${after.stage} (${stageName(after.stage)}).`);
+    }
+
+    const columns: Record<keyof PluginStepSettings, string> = {
+      name: 'name', description: 'description', stage: 'stage', mode: 'mode', rank: 'rank',
+      configuration: 'configuration', filteringAttributes: 'filteringattributes',
+    };
+    const changed = (Object.keys(columns) as (keyof PluginStepSettings)[]).filter((key) => after[key] !== before[key]);
+    if (changed.length > 0) {
+      const body = Object.fromEntries(changed.map((key) => [columns[key], after[key]]));
+      await this.client.patch(`api/data/v9.2/sdkmessageprocessingsteps(${id})`, body);
+    }
+
+    return { stepId: id, messageName, entityName, before, after, changes: changed };
+  }
+
+  /**
+   * Delete (unregister) a step. Dataverse deletes its images with it, in the same request, so the delete is one write.
+   * The step and its images are read first, so the result says what was deleted and a wrong id fails before anything
+   * is written. A managed step is refused: it goes when its solution is uninstalled.
+   *
+   * @param stepId The step's id (sdkmessageprocessingstepid)
+   */
+  async deletePluginStep(stepId: string): Promise<PluginStepDeleteResult> {
+    const id = odataGuid(stepId, 'stepId');
+    const step = await this.readStep(id);
+    if (step.ismanaged) {
+      throw new Error(`The step '${step.name}' is managed: it is removed by uninstalling its solution, not deleted here.`);
+    }
+    const images = await this.client.get<ApiCollectionResponse<{ sdkmessageprocessingstepimageid: string; name?: string }>>(
+      `api/data/v9.2/sdkmessageprocessingstepimages?$filter=_sdkmessageprocessingstepid_value eq ${id}&$select=sdkmessageprocessingstepimageid,name`,
+    );
+    const imageRows = images.value ?? [];
+    await this.client.delete(`api/data/v9.2/sdkmessageprocessingsteps(${id})`);
+
+    return {
+      stepId: id,
+      name: step.name,
+      messageName: step.sdkmessageid?.name ?? null,
+      entityName: step.sdkmessagefilterid?.primaryobjecttypecode ?? null,
+      stage: step.stage,
+      images: imageRows.map((image) => image.name ?? image.sdkmessageprocessingstepimageid),
+    };
+  }
+
+  private async readStep(id: string): Promise<StepRow> {
+    return this.client.get<StepRow>(
+      `api/data/v9.2/sdkmessageprocessingsteps(${id})?$select=name,description,stage,mode,rank,configuration,filteringattributes,ismanaged,iscustomizable`
+        + '&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)',
+    );
   }
 
   /**

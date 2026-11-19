@@ -142,3 +142,132 @@ describe('PluginService.createPluginStep', () => {
     expect(posted(calls).data).toMatchObject({ 'sdkmessagefilterid@odata.bind': `/sdkmessagefilters(${FILTER})` });
   });
 });
+
+describe('PluginService.updatePluginStep', () => {
+  const STEP = 'ba5bb700-53e3-f111-84ea-70a8a54b020b';
+  const stored = (over: Record<string, unknown> = {}) => ({
+    name: 'Contoso: Update of contoso_type', description: null, stage: 40, mode: 0, rank: 1, configuration: null,
+    filteringattributes: 'contoso_points,statecode', ismanaged: false, iscustomizable: { Value: true },
+    sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: 'contoso_type' }, ...over,
+  });
+  const service = (calls: RecordedCall[], step: unknown = stored()) =>
+    new PluginService(fakeClient([[`sdkmessageprocessingsteps(${STEP})?`, step]], calls));
+  const patched = (calls: RecordedCall[]) => calls.filter((c) => c.method === 'PATCH');
+
+  it('replaces the filtering attributes in place, sending only them', async () => {
+    const calls: RecordedCall[] = [];
+
+    const result = await service(calls).updatePluginStep(STEP, { filteringAttributes: ['contoso_points', ' contoso_Population', 'statecode', 'statecode'] });
+
+    expect(calls[0].endpoint).toBe(`api/data/v9.2/sdkmessageprocessingsteps(${STEP})?$select=name,description,stage,mode,rank,configuration,filteringattributes,ismanaged,iscustomizable`
+      + '&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)');
+    expect(patched(calls)).toEqual([{
+      method: 'PATCH', endpoint: `api/data/v9.2/sdkmessageprocessingsteps(${STEP})`,
+      data: { filteringattributes: 'contoso_points,contoso_population,statecode' }, headers: undefined,
+    }]);
+    expect(result).toMatchObject({
+      messageName: 'Update', entityName: 'contoso_type', changes: ['filteringAttributes'],
+      before: { filteringAttributes: 'contoso_points,statecode' },
+      after: { filteringAttributes: 'contoso_points,contoso_population,statecode', name: 'Contoso: Update of contoso_type' },
+    });
+  });
+
+  it('treats the same columns in another order or case as no change, and writes nothing', async () => {
+    const calls: RecordedCall[] = [];
+
+    const result = await service(calls).updatePluginStep(STEP, { filteringAttributes: ['StateCode', 'contoso_points'], rank: 1 });
+
+    expect(result.changes).toEqual([]);
+    expect(patched(calls)).toHaveLength(0);
+  });
+
+  it('clears the filtering attributes with null', async () => {
+    const calls: RecordedCall[] = [];
+
+    await service(calls).updatePluginStep(STEP, { filteringAttributes: null });
+
+    expect(patched(calls)[0].data).toEqual({ filteringattributes: null });
+  });
+
+  it('changes the name, description, stage, mode, rank and configuration together', async () => {
+    const calls: RecordedCall[] = [];
+
+    const result = await service(calls).updatePluginStep(STEP, {
+      name: 'Renamed', description: 'Shares 100', stage: 40, mode: 1, rank: 5, configuration: '{"x":1}',
+    });
+
+    expect(patched(calls)[0].data).toEqual({ name: 'Renamed', description: 'Shares 100', mode: 1, rank: 5, configuration: '{"x":1}' });
+    expect(result.changes).toEqual(['name', 'description', 'mode', 'rank', 'configuration']);
+  });
+
+  it('refuses filtering attributes on a step that is not on Update, and writes nothing', async () => {
+    const calls: RecordedCall[] = [];
+
+    await expect(service(calls, stored({ sdkmessageid: { name: 'Create' }, filteringattributes: null }))
+      .updatePluginStep(STEP, { filteringAttributes: ['contoso_points'] }))
+      .rejects.toThrow('Filtering attributes apply to Update steps only; this step is on Create.');
+    expect(patched(calls)).toHaveLength(0);
+  });
+
+  it('refuses an asynchronous step that would not run post-operation, counting the stage it keeps', async () => {
+    await expect(service([], stored({ stage: 20 })).updatePluginStep(STEP, { mode: 1 }))
+      .rejects.toThrow('An asynchronous step must run post-operation (stage 40); this one would run in stage 20 (PreOperation).');
+    await expect(service([], stored({ mode: 1 })).updatePluginStep(STEP, { stage: 10 }))
+      .rejects.toThrow(/would run in stage 10/);
+  });
+
+  it('refuses a stage, mode or rank it cannot set, and a call that changes nothing, before reading anything', async () => {
+    const calls: RecordedCall[] = [];
+    const update = (changes: Record<string, unknown>) => service(calls).updatePluginStep(STEP, changes);
+
+    await expect(update({ stage: 30 })).rejects.toThrow(/must be 10 \(PreValidation\), 20 \(PreOperation\) or 40 \(PostOperation\), not 30/);
+    await expect(update({ mode: 2 })).rejects.toThrow(/must be 0 \(Synchronous\) or 1 \(Asynchronous\)/);
+    await expect(update({ rank: 1.5 })).rejects.toThrow(/whole number/);
+    await expect(update({ name: '  ' })).rejects.toThrow('The name is empty.');
+    await expect(update({ filteringAttributes: [' ', ''] })).rejects.toThrow('The filtering attributes are empty.');
+    await expect(update({})).rejects.toThrow(/Nothing to change/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('refuses a step that is not customizable', async () => {
+    await expect(service([], stored({ ismanaged: true, iscustomizable: { Value: false } })).updatePluginStep(STEP, { rank: 2 }))
+      .rejects.toThrow("The step 'Contoso: Update of contoso_type' is managed and not customizable");
+  });
+});
+
+describe('PluginService.deletePluginStep', () => {
+  const STEP = '779bfe65-38e3-f111-84ea-7ced8d9a932a';
+  const service = (calls: RecordedCall[], over: Record<string, unknown> = {}, images: unknown[] = []) => new PluginService(fakeClient([
+    [`sdkmessageprocessingsteps(${STEP})?`, {
+      name: 'Contoso: Update of contoso_type', stage: 40, mode: 0, rank: 1, ismanaged: false,
+      sdkmessageid: { name: 'Update' }, sdkmessagefilterid: { primaryobjecttypecode: 'contoso_type' }, ...over,
+    }],
+    ['sdkmessageprocessingstepimages?', { value: images }],
+  ], calls));
+
+  it('deletes the step in one request and names the images that go with it', async () => {
+    const calls: RecordedCall[] = [];
+
+    const result = await service(calls, {}, [{ sdkmessageprocessingstepimageid: 'i1', name: 'PreImage' }]).deletePluginStep(STEP);
+
+    expect(calls.find((c) => c.endpoint.includes('sdkmessageprocessingstepimages'))?.endpoint)
+      .toBe(`api/data/v9.2/sdkmessageprocessingstepimages?$filter=_sdkmessageprocessingstepid_value eq ${STEP}&$select=sdkmessageprocessingstepimageid,name`);
+    expect(calls.filter((c) => c.method)).toEqual([{ method: 'DELETE', endpoint: `api/data/v9.2/sdkmessageprocessingsteps(${STEP})`, headers: undefined }]);
+    expect(result).toEqual({
+      stepId: STEP, name: 'Contoso: Update of contoso_type', messageName: 'Update', entityName: 'contoso_type', stage: 40, images: ['PreImage'],
+    });
+  });
+
+  it('refuses a managed step, and writes nothing', async () => {
+    const calls: RecordedCall[] = [];
+
+    await expect(service(calls, { ismanaged: true }).deletePluginStep(STEP)).rejects.toThrow(/is managed: it is removed by uninstalling its solution/);
+    expect(calls.filter((c) => c.method)).toHaveLength(0);
+  });
+
+  it('refuses an id that is not a GUID before any request', async () => {
+    const calls: RecordedCall[] = [];
+    await expect(service(calls).deletePluginStep("x' or 1 eq 1")).rejects.toThrow();
+    expect(calls).toHaveLength(0);
+  });
+});

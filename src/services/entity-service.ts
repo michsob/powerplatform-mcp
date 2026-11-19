@@ -14,6 +14,21 @@ export interface AttributeChanges {
   requiredLevel?: string;
   minValue?: number;
   maxValue?: number;
+  /** The display name in `languageCode`. */
+  displayName?: string;
+  /** The description (the column's tooltip) in `languageCode`. */
+  description?: string;
+  /** The language of the display name and description; the organization's base language when left out. */
+  languageCode?: number;
+}
+
+/** The settings `updateAttribute` reports; a label is reported in its language only when it is being changed. */
+export interface AttributeSettings {
+  requiredLevel?: string;
+  minValue?: number;
+  maxValue?: number;
+  displayName?: string;
+  description?: string;
 }
 
 /** An attribute's settings before and after `updateAttribute`. */
@@ -21,9 +36,37 @@ export interface AttributeUpdateResult {
   entityName: string;
   attributeName: string;
   attributeType?: string;
-  before: { requiredLevel?: string; minValue?: number; maxValue?: number };
-  after: { requiredLevel?: string; minValue?: number; maxValue?: number };
+  /** The language of the labels reported, when a label is being changed. */
+  languageCode?: number;
+  before: AttributeSettings;
+  after: AttributeSettings;
   changed: boolean;
+}
+
+/** A label as metadata returns it: one text per language, and the text in the calling user's language. */
+type Label = {
+  LocalizedLabels?: Array<Record<string, unknown> & { Label?: string; LanguageCode?: number }>;
+  UserLocalizedLabel?: (Record<string, unknown> & { Label?: string; LanguageCode?: number }) | null;
+};
+
+/** The label's text in one language, or undefined when it has none. */
+function labelText(label: Label | undefined, languageCode: number): string | undefined {
+  return label?.LocalizedLabels?.find((l) => l.LanguageCode === languageCode)?.Label;
+}
+
+/** The label with its text in one language replaced (or added); the other languages stay. */
+function withLabelText(label: Label | undefined, languageCode: number, text: string): Label {
+  const existing = label?.LocalizedLabels ?? [];
+  const index = existing.findIndex((l) => l.LanguageCode === languageCode);
+  const localized = index >= 0
+    ? existing.map((l, i) => (i === index ? { ...l, Label: text } : l))
+    : [...existing, { '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: text, LanguageCode: languageCode }];
+  const user = label?.UserLocalizedLabel;
+  return {
+    ...label,
+    LocalizedLabels: localized,
+    UserLocalizedLabel: user && user.LanguageCode === languageCode ? { ...user, Label: text } : user ?? null,
+  };
 }
 
 /** An attribute's definition as `EntityDefinitions(...)/Attributes(...)` returns it: the derived type, with its own properties. */
@@ -34,6 +77,8 @@ type AttributeDefinition = Record<string, unknown> & {
   RequiredLevel?: { Value?: string; CanBeChanged?: boolean; ManagedPropertyLogicalName?: string };
   MinValue?: number;
   MaxValue?: number;
+  DisplayName?: Label;
+  Description?: Label;
 };
 
 /**
@@ -259,9 +304,11 @@ export class EntityService {
   }
 
   /**
-   * Change an existing attribute's required level and, for a number (Integer, Decimal, Double, Money), its minimum and
-   * maximum. Like every metadata update this is a full-replace PUT: the attribute's definition is read, the asked values
-   * are changed, and it is put back with `MergeLabels`, so labels and every other setting stay. Publish afterwards.
+   * Change an existing attribute's required level, its display name and description, and, for a number (Integer,
+   * Decimal, Double, Money), its minimum and maximum. Like every metadata update this is a full-replace PUT: the
+   * attribute's definition is read, the asked values are changed, and it is put back with `MergeLabels`, so every other
+   * setting stays. A display name or description is set in one language (the organization's base language unless one is
+   * given); its text in the other languages stays. Publish afterwards.
    * Dataverse does not check the rows already stored against a new minimum or maximum.
    *
    * @param entityName Logical name of the entity (e.g. 'contoso_project')
@@ -276,8 +323,15 @@ export class EntityService {
     changes: AttributeChanges,
     solutionName?: string,
   ): Promise<AttributeUpdateResult> {
-    if (changes.requiredLevel === undefined && changes.minValue === undefined && changes.maxValue === undefined) {
-      throw new Error('Nothing to change: give a required level, a minimum or a maximum.');
+    const changesLabels = changes.displayName !== undefined || changes.description !== undefined;
+    if (changes.requiredLevel === undefined && changes.minValue === undefined && changes.maxValue === undefined && !changesLabels) {
+      throw new Error('Nothing to change: give a required level, a minimum, a maximum, a display name or a description.');
+    }
+    for (const [name, value] of [['display name', changes.displayName], ['description', changes.description]] as const) {
+      if (value !== undefined && value.trim() === '') throw new Error(`The ${name} is empty.`);
+    }
+    if (changes.languageCode !== undefined && !(Number.isInteger(changes.languageCode) && changes.languageCode > 0)) {
+      throw new Error(`The language code must be a language's LCID (e.g. 1033), not ${changes.languageCode}.`);
     }
     if (changes.requiredLevel !== undefined && !UPDATABLE_REQUIRED_LEVELS.includes(changes.requiredLevel)) {
       throw new Error(`The required level must be one of ${UPDATABLE_REQUIRED_LEVELS.join(', ')}, not '${changes.requiredLevel}'.`);
@@ -290,7 +344,10 @@ export class EntityService {
       `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Attributes(LogicalName=${odataString(attributeName)})`,
     );
     const type = String(metadata['@odata.type'] ?? '').replace(/^#/, '');
-    const before = { requiredLevel: metadata.RequiredLevel?.Value, minValue: metadata.MinValue, maxValue: metadata.MaxValue };
+    const languageCode = changesLabels ? changes.languageCode ?? await this.baseLanguage() : undefined;
+    const before: AttributeSettings = { requiredLevel: metadata.RequiredLevel?.Value, minValue: metadata.MinValue, maxValue: metadata.MaxValue };
+    if (languageCode !== undefined && changes.displayName !== undefined) before.displayName = labelText(metadata.DisplayName, languageCode);
+    if (languageCode !== undefined && changes.description !== undefined) before.description = labelText(metadata.Description, languageCode);
 
     const changesRange = changes.minValue !== undefined || changes.maxValue !== undefined;
     if (changesRange && !NUMBER_ATTRIBUTE_TYPES.includes(metadata.AttributeType ?? '')) {
@@ -300,17 +357,21 @@ export class EntityService {
       throw new Error(`The required level of '${attributeName}' cannot be changed (CanBeChanged is false).`);
     }
 
-    const after = {
+    const after: AttributeSettings = {
       requiredLevel: changes.requiredLevel ?? before.requiredLevel,
       minValue: changes.minValue ?? before.minValue,
       maxValue: changes.maxValue ?? before.maxValue,
     };
+    if (changes.displayName !== undefined) after.displayName = changes.displayName;
+    if (changes.description !== undefined) after.description = changes.description;
     if (after.minValue !== undefined && after.maxValue !== undefined && after.minValue > after.maxValue) {
       throw new Error(`The minimum (${after.minValue}) is above the maximum (${after.maxValue}).`);
     }
 
-    const changed = after.requiredLevel !== before.requiredLevel || after.minValue !== before.minValue || after.maxValue !== before.maxValue;
-    const result = { entityName, attributeName, attributeType: metadata.AttributeType, before, after, changed };
+    const changed = (['requiredLevel', 'minValue', 'maxValue', 'displayName', 'description'] as const)
+      .some((key) => after[key] !== before[key]);
+    const result: AttributeUpdateResult = { entityName, attributeName, attributeType: metadata.AttributeType, before, after, changed };
+    if (languageCode !== undefined) result.languageCode = languageCode;
     if (!changed) return result;
 
     const body: Record<string, unknown> = { ...metadata, '@odata.type': type };
@@ -318,6 +379,12 @@ export class EntityService {
     if (changes.requiredLevel !== undefined) body.RequiredLevel = { ...metadata.RequiredLevel, Value: changes.requiredLevel };
     if (changes.minValue !== undefined) body.MinValue = changes.minValue;
     if (changes.maxValue !== undefined) body.MaxValue = changes.maxValue;
+    if (languageCode !== undefined && after.displayName !== before.displayName) {
+      body.DisplayName = withLabelText(metadata.DisplayName, languageCode, after.displayName as string);
+    }
+    if (languageCode !== undefined && after.description !== before.description) {
+      body.Description = withLabelText(metadata.Description, languageCode, after.description as string);
+    }
 
     const headers: Record<string, string> = { 'MSCRM.MergeLabels': 'true' };
     if (solutionName) headers['MSCRM.SolutionUniqueName'] = solutionName;
@@ -1100,5 +1167,11 @@ export class EntityService {
     await this.client.delete(
       `api/data/v9.2/EntityDefinitions(LogicalName=${odataString(entityName)})/Keys(LogicalName=${odataString(keyName)})`,
     );
+  }
+
+  /** The organization's base language (its LCID), in which a label is set when no language is given. */
+  private async baseLanguage(): Promise<number> {
+    const result = await this.client.get<ApiCollectionResponse<{ languagecode: number }>>('api/data/v9.2/organizations?$select=languagecode');
+    return result.value?.[0]?.languagecode ?? 1033;
   }
 }

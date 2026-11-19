@@ -69,7 +69,7 @@ The Flow API (api.flow.microsoft.com) refuses an app registration that has no ma
 
 The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilot).
 
-### Available MCP Tools (66)
+### Available MCP Tools (68)
 
 All tools accept an optional `environment` parameter to target a specific environment (defaults to the first configured).
 
@@ -106,6 +106,8 @@ List tools stop at `maxRecords` and say so: `hasMore` is true when more rows mat
 | `get-plugin-type` | Look up a plugin type by class name | `typeName` | |
 | `get-sdk-message` | Look up an SDK message by name | `messageName` | |
 | `create-plugin-step` | Register a plugin step | `name`, `pluginTypeId`, `sdkMessageId`, `stage`, `mode` | `rank`, `supportedDeployment`, `description`, `configuration`, `sdkMessageFilterId` or `entityName`, `filteringAttributes`, `solutionName` |
+| `update-plugin-step` | Change a plugin step in place; writes only what differs | `stepId` | `name`, `description`, `stage`, `mode`, `rank`, `configuration`, `filteringAttributes` (null clears them) |
+| `delete-plugin-step` | Delete a plugin step, with its images | `stepId` | |
 
 #### Flows (Power Automate)
 
@@ -257,7 +259,7 @@ create-entity-lookup <referencingEntity> <referencedEntity> <relationshipSchemaN
 create-entity-alternate-key <entityName> <schemaName> <displayName> <keyAttributes...>  [--language-code <lcid>] [--solution <name>]
 delete-entity-alternate-key <entityName> <keyName>
 set-entity-change-tracking <entityName> <on|off>  [--solution <name>] [--no-publish]
-update-entity-attribute <entityName> <attributeName>  [--required-level <None|Recommended|ApplicationRequired>] [--min <n>] [--max <n>] [--solution <name>] [--no-publish]   # min/max on Integer, Decimal, Double, Money; labels and other settings stay
+update-entity-attribute <entityName> <attributeName>  [--required-level <None|Recommended|ApplicationRequired>] [--min <n>] [--max <n>] [--display-name <text>] [--description <text>] [--language-code <lcid>] [--solution <name>] [--no-publish]   # min/max on Integer, Decimal, Double, Money; a label is set in one language (default: the base language), the others stay
 delete-entity-attribute <entityName> <attributeName>
 ```
 
@@ -285,6 +287,8 @@ sdk-message <messageName>
 register-plugin-package <filePath>         --name <name> --unique-name <uniqueName> [--pkg-version <version>] [--solution <name>]
 update-plugin-package <filePath>           --plugin-package-id <id> [--pkg-version <version>]
 create-plugin-step <name> <pluginTypeId> <sdkMessageId>  [--stage <n>] [--mode <n>] [--rank <n>] [--supported-deployment <n>] [--description <desc>] [--configuration <cfg>] [--message-filter-id <id> | --entity <logicalName>] [--filtering-attributes <csv>] [--solution <name>]   # --entity looks up the table's filter; filtering attributes on Update steps only
+update-plugin-step <stepId>                [--name <name>] [--description <desc>] [--stage <n>] [--mode <n>] [--rank <n>] [--configuration <cfg>] [--filtering-attributes <csv> | --no-filtering-attributes]   # in place: keeps the id, images and solutions; writes only what differs
+delete-plugin-step <stepId>                # with its images; a managed step is refused
 create-plugin-step-image <stepId>          [--name <name>] [--entity-alias <alias>] [--image-type <0|1|2>] [--message-property-name <name>] [--attributes <csv>]
 ```
 

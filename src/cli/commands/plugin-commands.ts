@@ -2,7 +2,15 @@ import { readFileSync } from 'node:fs';
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
-import { stageName } from '../../services/plugin-service.js';
+import { stageName, type PluginStepSettings } from '../../services/plugin-service.js';
+
+/** A whole-number option, or undefined when it is left out. */
+function wholeNumber(value: string | undefined, name: string): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (value.trim() === '' || !Number.isInteger(parsed)) throw new Error(`--${name} must be a whole number, not '${value}'.`);
+  return parsed;
+}
 
 export function registerPluginCommands(program: Command, registry: EnvironmentRegistry): void {
   program
@@ -357,6 +365,71 @@ export function registerPluginCommands(program: Command, registry: EnvironmentRe
           ...(result.filteringAttributes ? [`  Filtering attributes: ${result.filteringAttributes}`] : []),
           `  Step ID: ${result.stepId}`,
         ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('update-plugin-step <stepId>')
+    .description('Change a plugin step in place: it keeps its id, its images and its solutions. Only the settings that differ are written.')
+    .option('--name <name>', 'Step name')
+    .option('--description <desc>', 'Step description')
+    .option('--stage <n>', 'Execution stage: 10=PreValidation, 20=PreOperation, 40=PostOperation')
+    .option('--mode <n>', 'Execution mode: 0=Synchronous, 1=Asynchronous (post-operation only)')
+    .option('--rank <n>', 'Execution order')
+    .option('--configuration <config>', 'Unsecure configuration string')
+    .option('--filtering-attributes <columns>', 'Update steps only: comma-separated columns whose change runs the step; replaces the list')
+    .option('--no-filtering-attributes', 'Clear the filtering attributes, so a change of any column runs the step')
+    .action(async (stepId: string, opts: {
+      name?: string;
+      description?: string;
+      stage?: string;
+      mode?: string;
+      rank?: string;
+      configuration?: string;
+      filteringAttributes?: string | false;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const result = await ctx.getPluginService().updatePluginStep(stepId, {
+        name: opts.name,
+        description: opts.description,
+        stage: wholeNumber(opts.stage, 'stage'),
+        mode: wholeNumber(opts.mode, 'mode'),
+        rank: wholeNumber(opts.rank, 'rank'),
+        configuration: opts.configuration,
+        filteringAttributes: opts.filteringAttributes === false ? null : opts.filteringAttributes?.split(','),
+      });
+
+      const where = [result.messageName, result.entityName].filter(Boolean).join(' of ');
+      const show = (key: keyof PluginStepSettings, value: unknown) =>
+        value === null ? '(none)' : key === 'stage' ? `${stageName(value)} (${String(value)})` : key === 'mode' ? `${value === 1 ? 'Asynchronous' : 'Synchronous'} (${String(value)})` : String(value);
+      outputResult({
+        fileName: `update-plugin-step-${result.stepId}`,
+        data: result,
+        summary: result.changes.length > 0
+          ? [
+            `Updated plugin step '${result.after.name}'${where ? ` (${where})` : ''}:`,
+            ...result.changes.map((key) => `  ${key}: ${show(key, result.before[key])} → ${show(key, result.after[key])}`),
+          ].join('\n')
+          : `Plugin step '${result.after.name}'${where ? ` (${where})` : ''} was already as asked; nothing changed.`,
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('delete-plugin-step <stepId>')
+    .description('Delete (unregister) a plugin step; Dataverse deletes its images with it. A managed step is refused.')
+    .action(async (stepId: string, _opts: unknown, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const result = await ctx.getPluginService().deletePluginStep(stepId);
+
+      const where = [result.messageName, result.entityName].filter(Boolean).join(' of ');
+      outputResult({
+        fileName: `delete-plugin-step-${result.stepId}`,
+        data: { deleted: true, ...result },
+        summary: [
+          `Deleted plugin step '${result.name}'${where ? ` (${where}, ${stageName(result.stage)})` : ''}`,
+          result.images.length > 0 ? ` and its ${result.images.length === 1 ? 'image' : `${result.images.length} images`} (${result.images.join(', ')})` : '',
+          '.',
+        ].join(''),
       }, ctx.environmentName);
     });
 

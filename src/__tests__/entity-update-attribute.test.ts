@@ -90,6 +90,69 @@ describe('EntityService.updateAttribute', () => {
       .rejects.toThrow(/cannot be changed/);
   });
 
+  it('sets the description in the organization\'s base language, keeping the other languages and the display name', async () => {
+    const calls: RecordedCall[] = [];
+    const labelled = integer({
+      Description: {
+        LocalizedLabels: [
+          { Label: 'Old tooltip', LanguageCode: 1033, IsManaged: false, MetadataId: 'l1' },
+          { Label: 'Stara podpowiedź', LanguageCode: 1045, IsManaged: false, MetadataId: 'l2' },
+        ],
+        UserLocalizedLabel: { Label: 'Old tooltip', LanguageCode: 1033, IsManaged: false, MetadataId: 'l1' },
+      },
+    });
+    const client = fakeClient([[ATTRIBUTE, labelled], ['organizations?', { value: [{ languagecode: 1033 }] }]], calls);
+
+    const result = await new EntityService(client).updateAttribute('contoso_type', 'contoso_halflife', { description: 'New tooltip' });
+
+    expect(result).toMatchObject({ changed: true, languageCode: 1033, before: { description: 'Old tooltip' }, after: { description: 'New tooltip' } });
+    const put = calls.find((c) => c.method === 'PUT');
+    expect(put?.headers).toEqual({ 'MSCRM.MergeLabels': 'true' });
+    expect(put?.data).toMatchObject({
+      Description: {
+        LocalizedLabels: [
+          { Label: 'New tooltip', LanguageCode: 1033, MetadataId: 'l1' },
+          { Label: 'Stara podpowiedź', LanguageCode: 1045, MetadataId: 'l2' },
+        ],
+        UserLocalizedLabel: { Label: 'New tooltip', LanguageCode: 1033 },
+      },
+      DisplayName: { LocalizedLabels: [{ Label: 'Half-life (Days)', LanguageCode: 1033 }] },
+      MinValue: 0,
+      RequiredLevel: { Value: 'None' },
+    });
+  });
+
+  it('adds a display name in a language the attribute has no label in, without asking for the base language', async () => {
+    const calls: RecordedCall[] = [];
+
+    const result = await service(calls, integer()).updateAttribute('contoso_type', 'contoso_halflife', { displayName: 'Okres półtrwania', languageCode: 1045 });
+
+    expect(calls.some((c) => c.endpoint.includes('organizations'))).toBe(false);
+    expect(result).toMatchObject({ before: { displayName: undefined }, after: { displayName: 'Okres półtrwania' } });
+    expect(calls.find((c) => c.method === 'PUT')?.data).toMatchObject({
+      DisplayName: {
+        LocalizedLabels: [{ Label: 'Half-life (Days)', LanguageCode: 1033 }, { Label: 'Okres półtrwania', LanguageCode: 1045 }],
+        UserLocalizedLabel: null,
+      },
+    });
+  });
+
+  it('writes nothing when the label is already as asked', async () => {
+    const calls: RecordedCall[] = [];
+
+    const result = await service(calls, integer()).updateAttribute('contoso_type', 'contoso_halflife', { displayName: 'Half-life (Days)', languageCode: 1033 });
+
+    expect(result.changed).toBe(false);
+    expect(calls.filter((c) => c.method)).toHaveLength(0);
+  });
+
+  it('refuses an empty label and a language code that is not an LCID', async () => {
+    await expect(service([], integer()).updateAttribute('contoso_type', 'contoso_halflife', { description: ' ' }))
+      .rejects.toThrow('The description is empty.');
+    await expect(service([], integer()).updateAttribute('contoso_type', 'contoso_halflife', { displayName: 'X', languageCode: 0 }))
+      .rejects.toThrow(/must be a language's LCID/);
+  });
+
   it('refuses a call that changes nothing, before reading anything', async () => {
     const calls: RecordedCall[] = [];
     await expect(service(calls, integer()).updateAttribute('contoso_type', 'contoso_halflife', {})).rejects.toThrow(/Nothing to change/);
