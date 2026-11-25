@@ -1,7 +1,9 @@
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
-import { componentTypeName, missingDependencySummary } from '../../services/solution-service.js';
+import {
+  TABLE_INCLUDE_BEHAVIOR, componentTypeName, missingDependencySummary, tableIncludeDescription, type TableInclude,
+} from '../../services/solution-service.js';
 
 export function registerSolutionCommands(program: Command, registry: EnvironmentRegistry): void {
   program
@@ -87,25 +89,41 @@ export function registerSolutionCommands(program: Command, registry: Environment
 
   program
     .command('add-solution-component <solutionUniqueName> <componentId> <componentType>')
-    .description('Add a component to a Dataverse solution')
+    .description('Add a component to a Dataverse solution. A table comes with all its columns, forms and views unless ' +
+      '--include says otherwise; add the ones you want one by one (type 2 a column, 60 a form, 26 a view)')
     .option('--add-required', 'Also add required dependencies')
+    .option('--include <all|metadata|shell>', "Tables only: all their columns, forms and views (default), the table's metadata " +
+      'without them, or a shell holding only the ones added one by one')
     .action(async (solutionUniqueName: string, componentId: string, componentType: string, opts: {
       addRequired?: boolean;
+      include?: string;
     }, command: Command) => {
+      if (opts.include !== undefined && !(opts.include in TABLE_INCLUDE_BEHAVIOR)) {
+        throw new Error(`--include must be all, metadata or shell, not '${opts.include}'.`);
+      }
+      const include = opts.include as TableInclude | undefined;
+      const type = parseInt(componentType, 10);
       const ctx = registry.getContext(command.optsWithGlobals().env);
       const service = ctx.getSolutionService();
       const result = await service.addSolutionComponent(
-        solutionUniqueName, componentId, parseInt(componentType, 10), opts.addRequired ?? false,
+        solutionUniqueName, componentId, type, opts.addRequired ?? false, { include },
       );
+      // Read back: Dataverse widens how a solution holds a table (shell, metadata, all), never narrows it.
+      const behavior = type === 1 ? await service.getTableInclude(solutionUniqueName, componentId) : undefined;
 
       outputResult({
         fileName: `add-component-${solutionUniqueName}-${componentId}`,
-        data: result,
+        data: behavior === undefined ? result : { result, rootComponentBehavior: behavior },
         summary: [
           `Added component to solution '${solutionUniqueName}':`,
           `  Component ID: ${componentId}`,
-          `  Component Type: ${componentType}`,
+          `  Component Type: ${componentTypeName(type)} (${componentType})`,
           `  Add Required: ${opts.addRequired ?? false}`,
+          ...(behavior === undefined ? [] : [`  The solution holds the table ${tableIncludeDescription(behavior)}`]),
+          ...(include && behavior !== undefined && behavior !== TABLE_INCLUDE_BEHAVIOR[include]
+            ? [`  ⚠ Not '${include}': Dataverse adds to how a solution holds a table but never takes away;`,
+              '    to hold less, remove-solution-component it first and add it again']
+            : []),
         ].join('\n'),
       }, ctx.environmentName);
     });

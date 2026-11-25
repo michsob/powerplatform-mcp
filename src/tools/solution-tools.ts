@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
-import { missingDependencySummary } from "../services/solution-service.js";
+import { TABLE_INCLUDE_BEHAVIOR, missingDependencySummary, tableIncludeDescription } from "../services/solution-service.js";
 
 /**
  * Register solution tools with the MCP server.
@@ -201,36 +201,44 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
     "add-solution-component",
     {
       title: "Add Solution Component",
-      description: "Add a component to a Dataverse solution",
+      description: "Add a component to a Dataverse solution. A table (componentType 1) comes with all its columns, forms and views unless include says otherwise, the same choices the maker portal offers: 'metadata' adds the table's own definition without them, 'shell' only a container for them. To put only some of a table's columns, forms or views in a solution, add each with this tool (componentType 2 with the column's MetadataId from get-entity-attribute, 60 with a form's formid, 26 with a view's savedqueryid); adding one of a table the solution does not hold brings the table in as a shell. Adding a table again widens how the solution holds it (shell, then metadata, then all) but never narrows it: to hold less, remove it with remove-solution-component and add it again. For a table, the answer says how the solution now holds it.",
       inputSchema: {
         solutionUniqueName: z.string().describe("The unique name of the target solution"),
-        componentId: z.string().describe("The GUID of the component to add"),
+        componentId: z.string().describe("The GUID of the component to add (a table's MetadataId for componentType 1)"),
         componentType: z.number().describe("Component type code (1=Entity, 2=Attribute, 9=OptionSet, 26=View, 29=Process, 60=SystemForm, 61=WebResource, 80=ModelDrivenApp, 90=PluginType, 91=PluginAssembly, 92=SdkMessageProcessingStep, 93=SdkMessageProcessingStepImage, 300=CanvasApp, 380=EnvironmentVariableDefinition, etc.)"),
         addRequiredComponents: z.boolean().optional().describe("Also add required dependencies (default: false)"),
+        include: z.enum(["all", "metadata", "shell"]).optional().describe("Tables only: 'all' its columns, forms and views (default), 'metadata' the table's definition without them, or 'shell' only a container for the ones added one by one"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
         solutionUniqueName: z.string(),
         componentId: z.string(),
+        rootComponentBehavior: z.number().nullable().optional(),
         result: z.any(),
       }),
     },
-    async ({ solutionUniqueName, componentId, componentType, addRequiredComponents, environment }) => {
+    async ({ solutionUniqueName, componentId, componentType, addRequiredComponents, include, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getSolutionService();
         const result = await service.addSolutionComponent(
-          solutionUniqueName, componentId, componentType, addRequiredComponents ?? false,
+          solutionUniqueName, componentId, componentType, addRequiredComponents ?? false, { include },
         );
 
+        let text = `Added component ${componentId} (type: ${componentType}) to solution '${solutionUniqueName}'`;
+        let rootComponentBehavior: number | null | undefined;
+        if (componentType === 1) {
+          // Read back: Dataverse widens how a solution holds a table (shell, metadata, all), never narrows it.
+          rootComponentBehavior = await service.getTableInclude(solutionUniqueName, componentId);
+          text = `Added table ${componentId} to solution '${solutionUniqueName}': the solution holds it ${tableIncludeDescription(rootComponentBehavior)}.`;
+          if (include && rootComponentBehavior !== TABLE_INCLUDE_BEHAVIOR[include]) {
+            text += ` That is not '${include}': Dataverse adds to how a solution holds a table but never takes away, so to hold less, remove the table from the solution first and add it again.`;
+          }
+        }
+
         return {
-          structuredContent: { solutionUniqueName, componentId, result },
-          content: [
-            {
-              type: "text",
-              text: `Added component ${componentId} (type: ${componentType}) to solution '${solutionUniqueName}'`,
-            },
-          ],
+          structuredContent: { solutionUniqueName, componentId, ...(rootComponentBehavior !== undefined ? { rootComponentBehavior } : {}), result },
+          content: [{ type: "text", text }],
         };
       } catch (error: any) {
         console.error("Error adding solution component:", error);
@@ -273,7 +281,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
         const service = ctx.getSolutionService();
         const result = await service.removeSolutionComponent(solutionUniqueName, componentId, componentType);
         const subs = result.subcomponents.length > 0
-          ? ` with the ${result.subcomponents.length} subcomponents it held under it`
+          ? ` with the ${result.subcomponents.length === 1 ? "subcomponent" : `${result.subcomponents.length} subcomponents`} it held under it`
           : '';
 
         return {
@@ -336,7 +344,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
         );
         const behavior = result.rootComponentBehavior;
         const subs = result.subcomponents.length > 0
-          ? ` with the ${result.subcomponents.length} subcomponents it held under it`
+          ? ` with the ${result.subcomponents.length === 1 ? "subcomponent" : `${result.subcomponents.length} subcomponents`} it held under it`
           : '';
 
         const lines = [
