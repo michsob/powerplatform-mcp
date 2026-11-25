@@ -43,6 +43,7 @@ export function registerBusinessRuleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error getting business rules:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -101,6 +102,7 @@ export function registerBusinessRuleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error getting business rule:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",

@@ -41,6 +41,7 @@ export function registerDependencyTools(server: McpServer, registry: Environment
       } catch (error: any) {
         console.error("Error checking component dependencies:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -92,6 +93,7 @@ export function registerDependencyTools(server: McpServer, registry: Environment
       } catch (error: any) {
         console.error("Error checking delete eligibility:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",

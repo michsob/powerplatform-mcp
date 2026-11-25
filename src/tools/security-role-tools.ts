@@ -50,6 +50,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error getting security roles:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -96,6 +97,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error getting security role privileges:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -143,6 +145,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error listing privileges:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -190,6 +193,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error creating security role:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -237,6 +241,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error cloning security role:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -284,6 +289,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error updating security role:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -341,6 +347,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error deleting security role:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -386,6 +393,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error adding role privileges:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -431,6 +439,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error removing role privileges:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -490,6 +499,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error replacing role privileges:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",

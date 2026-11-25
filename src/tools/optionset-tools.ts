@@ -39,6 +39,7 @@ export function registerOptionSetTools(server: McpServer, registry: EnvironmentR
       } catch (error: any) {
         console.error("Error getting global option set:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",

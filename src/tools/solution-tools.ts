@@ -38,6 +38,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting publishers:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -80,6 +81,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting solutions:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -114,6 +116,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
 
         if (!solution) {
           return {
+            isError: true,
             content: [
               {
                 type: "text",
@@ -135,6 +138,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting solution:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -179,6 +183,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting solution components:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -229,6 +234,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error adding solution component:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -270,6 +276,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error publishing customizations:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -315,6 +322,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error exporting solution:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",

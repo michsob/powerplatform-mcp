@@ -45,6 +45,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
       } catch (error: any) {
         console.error("Error getting web resources:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -79,6 +80,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
 
         if (!webResource) {
           return {
+            isError: true,
             content: [
               {
                 type: "text",
@@ -100,6 +102,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
       } catch (error: any) {
         console.error("Error getting web resource:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -151,6 +154,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
       } catch (error: any) {
         console.error("Error creating web resource:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",

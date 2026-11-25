@@ -44,6 +44,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting plugin assemblies:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -95,6 +96,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting plugin assembly:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -147,6 +149,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity plugin pipeline:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -212,6 +215,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting plugin trace logs:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -246,6 +250,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
 
         if (!pluginType) {
           return {
+            isError: true,
             content: [{ type: "text", text: `Plugin type '${typeName}' not found` }],
           };
         }
@@ -262,6 +267,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting plugin type:", error);
         return {
+          isError: true,
           content: [{ type: "text", text: `Failed to get plugin type: ${error.message}` }],
         };
       }
@@ -291,6 +297,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
 
         if (!message) {
           return {
+            isError: true,
             content: [
               {
                 type: "text",
@@ -312,6 +319,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting SDK message:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -374,6 +382,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error creating plugin step:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -430,6 +439,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error updating plugin step:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -474,6 +484,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error deleting plugin step:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -521,6 +532,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting all plugin steps:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
