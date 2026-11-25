@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// First: loads .env before any other module reads the environment.
+import "./load-env.js";
 import { readFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";

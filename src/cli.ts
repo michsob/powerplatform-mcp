@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// First: loads .env before any other module reads the environment.
+import './load-env.js';
 import { readFileSync } from 'node:fs';
 import { Command } from 'commander';
 import { EnvironmentRegistry } from './environment-config.js';
