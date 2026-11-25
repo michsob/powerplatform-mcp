@@ -156,6 +156,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         maxLength: z.number().optional().describe("Maximum text length (default: 100)"),
         requiredLevel: z.enum(["None", "ApplicationRequired", "SystemRequired"]).optional().describe("Required level (default: None)"),
         description: z.string().optional().describe("Description for the attribute"),
+        languageCode: z.number().int().positive().optional().describe("Language code (LCID) of the labels, e.g. 1033 for English. Defaults to the organization's base language."),
         solutionName: z.string().optional().describe("Solution unique name to add the component to"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
@@ -165,14 +166,14 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         attributeId: z.string(),
       }),
     },
-    async ({ entityName, schemaName, displayName, maxLength, requiredLevel, description, solutionName, environment }) => {
+    async ({ entityName, schemaName, displayName, maxLength, requiredLevel, description, languageCode, solutionName, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getEntityService();
         const result = await service.createStringAttribute(
           entityName, schemaName, displayName,
           maxLength ?? 100, requiredLevel ?? 'None', description,
-          undefined, solutionName,
+          languageCode, solutionName,
         );
 
         return {
@@ -255,7 +256,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         schemaName: z.string().describe("The schema name for the key"),
         displayName: z.string().describe("The display name for the key"),
         keyAttributes: z.array(z.string()).describe("Array of attribute logical names that make up the key"),
-        languageCode: z.number().int().positive().optional().describe("Language code (LCID) of the display name label, e.g. 1033 for English. Defaults to 1045."),
+        languageCode: z.number().int().positive().optional().describe("Language code (LCID) of the display name label, e.g. 1033 for English. Defaults to the organization's base language."),
         solutionName: z.string().optional().describe("Solution unique name to add the component to"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },

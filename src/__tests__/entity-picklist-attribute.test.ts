@@ -28,7 +28,7 @@ describe('EntityService.createPicklistAttribute', () => {
 
   it('keeps a local choice as before, with no default unless asked', async () => {
     const calls: RecordedCall[] = [];
-    const service = new EntityService(fakeClient([], calls));
+    const service = new EntityService(fakeClient([['organizations?', { value: [{ languagecode: 1033 }] }]], calls));
 
     await service.createPicklistAttribute('contoso_settings', 'contoso_size', 'Size', [{ value: 1, label: 'Small' }]);
 

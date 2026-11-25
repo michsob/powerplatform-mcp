@@ -4,6 +4,16 @@ import { outputResult } from '../output.js';
 import type { AttributeUpdateResult } from '../../services/entity-service.js';
 
 /** `<prefix>_Name` for an entity schema name such as `contoso_Project`; the prefix must match the publisher's. */
+/** `--language-code`: an LCID, or undefined for the organization's base language. */
+function languageCodeOption(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const lcid = Number(value);
+  if (!Number.isInteger(lcid) || lcid <= 0) {
+    throw new Error(`--language-code must be a positive whole number (an LCID such as 1033), not '${value}'.`);
+  }
+  return lcid;
+}
+
 export function defaultPrimaryNameSchema(entitySchemaName: string): string {
   const underscore = entitySchemaName.indexOf('_');
   return underscore > 0 ? `${entitySchemaName.slice(0, underscore)}_Name` : 'Name';
@@ -90,13 +100,16 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
     .option('--max-length <n>', 'Maximum text length', '100')
     .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
     .option('--description <desc>', 'Description for the attribute')
+    .option('--language-code <lcid>', "Language code (LCID) of the labels, e.g. 1033 for English (default: the organization's base language)")
     .option('--solution <name>', 'Solution unique name to add the component to')
     .action(async (entityName: string, schemaName: string, displayName: string, opts: {
       maxLength: string;
       requiredLevel: string;
       description?: string;
+      languageCode?: string;
       solution?: string;
     }, command: Command) => {
+      const languageCode = languageCodeOption(opts.languageCode);
       const ctx = registry.getContext(command.optsWithGlobals().env);
       const service = ctx.getEntityService();
       const result = await service.createStringAttribute(
@@ -104,7 +117,7 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
         parseInt(opts.maxLength, 10),
         opts.requiredLevel as 'None' | 'ApplicationRequired' | 'SystemRequired',
         opts.description,
-        undefined, opts.solution,
+        languageCode, opts.solution,
       );
 
       outputResult({
@@ -185,7 +198,7 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
     .option('--default-value <value>', 'The option a new record gets (DefaultFormValue)')
     .option('--required-level <level>', 'Required level: None, ApplicationRequired, SystemRequired', 'None')
     .option('--description <desc>', 'Description for the attribute')
-    .option('--language-code <lcid>', 'Language code (LCID) of the labels, e.g. 1033 for English', '1045')
+    .option('--language-code <lcid>', "Language code (LCID) of the labels, e.g. 1033 for English (default: the organization's base language)")
     .option('--solution <name>', 'Solution unique name to add the component to')
     .action(async (entityName: string, schemaName: string, displayName: string, opts: {
       option: string[];
@@ -193,7 +206,7 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
       defaultValue?: string;
       requiredLevel: string;
       description?: string;
-      languageCode: string;
+      languageCode?: string;
       solution?: string;
     }, command: Command) => {
       if (opts.globalOptionSet ? opts.option.length > 0 : opts.option.length === 0) {
@@ -212,10 +225,7 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
         return { value: parseInt(o.substring(0, colonIdx), 10), label: o.substring(colonIdx + 1) };
       });
 
-      const languageCode = Number(opts.languageCode);
-      if (!Number.isInteger(languageCode) || languageCode <= 0) {
-        throw new Error(`--language-code must be a positive whole number (an LCID such as 1033), not '${opts.languageCode}'.`);
-      }
+      const languageCode = languageCodeOption(opts.languageCode);
       const defaultValue = opts.defaultValue === undefined ? undefined : Number(opts.defaultValue);
       if (defaultValue !== undefined && !Number.isInteger(defaultValue)) {
         throw new Error(`--default-value must be an option's whole-number value, not '${opts.defaultValue}'.`);
@@ -648,15 +658,12 @@ export function registerEntityCommands(program: Command, registry: EnvironmentRe
     .description('Create an alternate key on a Dataverse entity')
     .argument('<keyAttributes...>', 'Attribute logical names that make up the key')
     .option('--solution <name>', 'Solution unique name to add the component to')
-    .option('--language-code <lcid>', 'Language code (LCID) of the display name label, e.g. 1033 for English', '1045')
+    .option('--language-code <lcid>', "Language code (LCID) of the display name label, e.g. 1033 for English (default: the organization's base language)")
     .action(async (entityName: string, schemaName: string, displayName: string, keyAttributes: string[], opts: {
       solution?: string;
-      languageCode: string;
+      languageCode?: string;
     }, command: Command) => {
-      const languageCode = Number(opts.languageCode);
-      if (!Number.isInteger(languageCode) || languageCode <= 0) {
-        throw new Error(`--language-code must be a positive whole number (an LCID such as 1033), not '${opts.languageCode}'.`);
-      }
+      const languageCode = languageCodeOption(opts.languageCode);
       const ctx = registry.getContext(command.optsWithGlobals().env);
       const service = ctx.getEntityService();
       const result = await service.createAlternateKey(entityName, schemaName, displayName, keyAttributes, languageCode, opts.solution);
