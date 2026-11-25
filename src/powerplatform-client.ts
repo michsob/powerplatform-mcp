@@ -1,13 +1,33 @@
-import { ConfidentialClientApplication } from '@azure/msal-node';
+import type { AuthenticationResult } from '@azure/msal-node';
 import axios, { type Method } from 'axios';
+import { AuthenticationError, authenticationError } from './auth/errors.js';
+import { ClientSecretTokenSource, InteractiveTokenSource, type TokenSource } from './auth/token-sources.js';
 import { fetchAllPages, type FetchAllOptions } from './odata.js';
+
+export { AuthenticationError } from './auth/errors.js';
+
+/** How a client signs in: as an app with its client secret, or as a person in the browser. */
+export type AuthMethod = 'client-secret' | 'interactive';
 
 export interface PowerPlatformConfig {
   organizationUrl: string;
   clientId: string;
-  clientSecret: string;
   tenantId: string;
+  /** Defaults to `client-secret`. */
+  authMethod?: AuthMethod;
+  /** The app's secret: required for `client-secret`. */
+  clientSecret?: string;
+  /** `interactive`: the account to sign in with (login hint, and which cached account to use). */
+  email?: string;
+  /** `interactive`: whether a token request may open the browser (the CLI) or must use the cache (the MCP server). */
+  allowInteractive?: boolean;
+  /** `interactive`: overrides the token cache file. */
+  tokenCachePath?: string;
+  /** The environment's name, for sign-in messages. */
+  environmentName?: string;
 }
+
+const FLOW_SCOPE = 'https://service.flow.microsoft.com/.default';
 
 /**
  * How long one request may take before it fails. Dataverse stops a query itself after about two
@@ -35,14 +55,6 @@ export class DataverseRequestError extends Error {
   }
 }
 
-/** Token acquisition failed. The message carries MSAL's error code and the AADSTS reason. */
-export class AuthenticationError extends Error {
-  constructor(message: string, readonly code?: string) {
-    super(message);
-    this.name = 'AuthenticationError';
-  }
-}
-
 /**
  * A failed request as a `DataverseRequestError`. Built from the response, never from the axios
  * error object as a whole: that carries the request config, and with it the bearer token.
@@ -63,16 +75,6 @@ function requestError(label: string, error: unknown): DataverseRequestError {
   return new DataverseRequestError(`${label} failed: ${message}`);
 }
 
-/** MSAL's error as text: its code and the first line of its message (the AADSTS reason). */
-function authenticationError(what: string, error: unknown): AuthenticationError {
-  const e = error as { errorCode?: unknown; errorMessage?: unknown; message?: unknown } | null;
-  const code = typeof e?.errorCode === 'string' && e.errorCode ? e.errorCode : undefined;
-  const text = typeof e?.errorMessage === 'string' && e.errorMessage ? e.errorMessage
-    : typeof e?.message === 'string' ? e.message : String(error);
-  const reason = text.split(/\r?\n/)[0].trim();
-  return new AuthenticationError(`${what} failed${code ? ` (${code})` : ''}: ${reason}`, code);
-}
-
 interface SendOptions {
   method: Method;
   url: string;
@@ -89,23 +91,27 @@ interface SendOptions {
  */
 export class PowerPlatformClient {
   private config: PowerPlatformConfig;
-  private msalClient: ConfidentialClientApplication;
-  private accessToken: string | null = null;
-  private tokenExpirationTime: number = 0;
-  private managementAccessToken: string | null = null;
-  private managementTokenExpirationTime: number = 0;
+  private tokenSource: TokenSource;
+  /** Tokens per scope, each until 5 minutes before it expires. */
+  private tokens = new Map<string, { accessToken: string; refreshAt: number }>();
 
   constructor(config: PowerPlatformConfig) {
     // A trailing slash would produce `…//api/data` and a `…//.default` scope that Entra rejects.
     this.config = { ...config, organizationUrl: config.organizationUrl.trim().replace(/\/+$/, '') };
 
-    this.msalClient = new ConfidentialClientApplication({
-      auth: {
-        clientId: this.config.clientId,
-        clientSecret: this.config.clientSecret,
-        authority: `https://login.microsoftonline.com/${this.config.tenantId}`,
-      }
-    });
+    if (this.authMethod === 'interactive') {
+      this.tokenSource = new InteractiveTokenSource({
+        environmentName: config.environmentName ?? this.config.organizationUrl,
+        tenantId: config.tenantId,
+        clientId: config.clientId,
+        email: config.email,
+        allowInteractive: config.allowInteractive ?? false,
+        tokenCachePath: config.tokenCachePath,
+      });
+    } else {
+      if (!config.clientSecret) throw new Error('A client secret is required to sign in with authMethod client-secret');
+      this.tokenSource = new ClientSecretTokenSource(config.tenantId, config.clientId, config.clientSecret);
+    }
   }
 
   /**
@@ -115,60 +121,85 @@ export class PowerPlatformClient {
     return this.config.organizationUrl;
   }
 
+  get authMethod(): AuthMethod {
+    return this.config.authMethod ?? 'client-secret';
+  }
+
+  private get dataverseScope(): string {
+    return `${this.config.organizationUrl}/.default`;
+  }
+
   /**
    * Get an access token for the PowerPlatform API
    */
-  private async getAccessToken(): Promise<string> {
-    if (this.accessToken && this.tokenExpirationTime > Date.now()) {
-      return this.accessToken;
-    }
-
-    let result;
-    try {
-      result = await this.msalClient.acquireTokenByClientCredential({
-        scopes: [`${this.config.organizationUrl}/.default`],
-      });
-    } catch (error) {
-      const failure = authenticationError('Authentication', error);
-      console.error(failure.message);
-      throw failure;
-    }
-    if (!result?.accessToken) {
-      throw new AuthenticationError('Authentication failed: no access token was returned');
-    }
-
-    this.accessToken = result.accessToken;
-    // Refresh 5 minutes early.
-    this.tokenExpirationTime = result.expiresOn ? result.expiresOn.getTime() - 5 * 60 * 1000 : 0;
-    return this.accessToken;
+  private getAccessToken(): Promise<string> {
+    return this.token(this.dataverseScope, 'Authentication');
   }
 
   /**
    * Get an access token for the Flow Management API (api.flow.microsoft.com).
    * Uses a different scope than the Dataverse token.
    */
-  async getManagementToken(): Promise<string> {
-    if (this.managementAccessToken && this.managementTokenExpirationTime > Date.now()) {
-      return this.managementAccessToken;
-    }
+  getManagementToken(): Promise<string> {
+    return this.token(FLOW_SCOPE, 'Management API authentication');
+  }
 
-    let result;
+  private async token(scope: string, what: string): Promise<string> {
+    const held = this.tokens.get(scope);
+    if (held && held.refreshAt > Date.now()) return held.accessToken;
+
+    let result: AuthenticationResult | null;
     try {
-      result = await this.msalClient.acquireTokenByClientCredential({
-        scopes: ['https://service.flow.microsoft.com/.default'],
-      });
+      result = await this.tokenSource.acquire(scope);
     } catch (error) {
-      const failure = authenticationError('Management API authentication', error);
+      const failure = authenticationError(what, error);
       console.error(failure.message);
       throw failure;
     }
-    if (!result?.accessToken) {
-      throw new AuthenticationError('Management API authentication failed: no access token was returned');
-    }
+    return this.remember(scope, result, what);
+  }
 
-    this.managementAccessToken = result.accessToken;
-    this.managementTokenExpirationTime = result.expiresOn ? result.expiresOn.getTime() - 5 * 60 * 1000 : 0;
-    return this.managementAccessToken;
+  private remember(scope: string, result: AuthenticationResult | null, what: string): string {
+    if (!result?.accessToken) {
+      throw new AuthenticationError(`${what} failed: no access token was returned`);
+    }
+    // Refresh 5 minutes early.
+    this.tokens.set(scope, {
+      accessToken: result.accessToken,
+      refreshAt: result.expiresOn ? result.expiresOn.getTime() - 5 * 60 * 1000 : 0,
+    });
+    return result.accessToken;
+  }
+
+  /**
+   * Sign in in the browser now (interactive environments only) and cache the sign-in for later commands and the
+   * MCP server. Returns the account's user name.
+   */
+  async login(): Promise<{ username: string }> {
+    const source = this.interactiveSource('login');
+    let result: AuthenticationResult;
+    try {
+      result = await source.signIn(this.dataverseScope);
+    } catch (error) {
+      throw authenticationError('Sign-in', error);
+    }
+    this.remember(this.dataverseScope, result, 'Sign-in');
+    return { username: result.account?.username ?? '' };
+  }
+
+  /** Forget the cached sign-in (interactive environments only). Returns the user names removed. */
+  async logout(): Promise<string[]> {
+    const removed = await this.interactiveSource('logout').signOut();
+    this.tokens.clear();
+    return removed;
+  }
+
+  private interactiveSource(action: string): InteractiveTokenSource {
+    if (!(this.tokenSource instanceof InteractiveTokenSource)) {
+      throw new Error(`${action} applies to an environment that signs in interactively (AUTH_METHOD=interactive); ` +
+        `${this.config.environmentName ?? this.config.organizationUrl} signs in with a client secret`);
+    }
+    return this.tokenSource;
   }
 
   /** One HTTP request with the common headers and the timeout; failures become `DataverseRequestError`. */

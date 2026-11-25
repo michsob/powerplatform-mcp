@@ -6,16 +6,18 @@ import type { EnvironmentRegistry } from '../../environment-config.js';
 
 /**
  * Ensure pac CLI is authenticated to the given environment.
- * Creates an auth profile using the same credentials from POWERPLATFORM_* env vars.
+ * Creates an auth profile using the same credentials from POWERPLATFORM_* env vars; an interactive environment
+ * gets an interactive pac profile (pac signs in itself).
  */
 function ensurePacAuth(envName: string): void {
   const prefix = `POWERPLATFORM_${envName}`;
   const url = process.env[`${prefix}_URL`];
+  const interactive = process.env[`${prefix}_AUTH_METHOD`]?.trim().toLowerCase() === 'interactive';
   const clientId = process.env[`${prefix}_CLIENT_ID`];
   const clientSecret = process.env[`${prefix}_CLIENT_SECRET`];
   const tenantId = process.env[`${prefix}_TENANT_ID`];
 
-  if (!url || !clientId || !clientSecret || !tenantId) {
+  if (!url || (!interactive && (!clientId || !clientSecret || !tenantId))) {
     throw new Error(`Missing POWERPLATFORM_${envName}_* environment variables for pac auth`);
   }
 
@@ -40,14 +42,16 @@ function ensurePacAuth(envName: string): void {
   }
 
   console.log(`Creating pac auth profile for ${envName} (${url})...`);
-  const cmd = [
-    'pac', 'auth', 'create',
-    '--name', `"${envName}"`,
-    '--applicationId', clientId,
-    '--clientSecret', `"${clientSecret}"`,
-    '--tenant', tenantId,
-    '--environment', `"${url}"`,
-  ].join(' ');
+  const cmd = (interactive
+    ? ['pac', 'auth', 'create', '--name', `"${envName}"`, '--environment', `"${url}"`]
+    : [
+      'pac', 'auth', 'create',
+      '--name', `"${envName}"`,
+      '--applicationId', clientId!,
+      '--clientSecret', `"${clientSecret}"`,
+      '--tenant', tenantId!,
+      '--environment', `"${url}"`,
+    ]).join(' ');
 
   execSync(cmd, { stdio: 'inherit', encoding: 'utf-8' });
 }

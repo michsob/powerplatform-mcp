@@ -8,11 +8,11 @@ export function hasCredentials(): boolean {
   if (!firstName) return false;
 
   const prefix = `POWERPLATFORM_${firstName}`;
+  const interactive = process.env[`${prefix}_AUTH_METHOD`]?.trim().toLowerCase() === 'interactive';
   return !!(
     process.env[`${prefix}_URL`] &&
-    process.env[`${prefix}_CLIENT_ID`] &&
-    process.env[`${prefix}_CLIENT_SECRET`] &&
-    process.env[`${prefix}_TENANT_ID`]
+    process.env[`${prefix}_TENANT_ID`] &&
+    (interactive || (process.env[`${prefix}_CLIENT_ID`] && process.env[`${prefix}_CLIENT_SECRET`]))
   );
 }
 

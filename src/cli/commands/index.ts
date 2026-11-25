@@ -18,8 +18,10 @@ import { registerWebResourceCommands } from './webresource-commands.js';
 import { registerPacCommands } from './pac-commands.js';
 import { registerApplicationUserCommands } from './application-user-commands.js';
 import { registerModelDrivenAppCommands } from './model-driven-app-commands.js';
+import { registerAuthCommands } from './auth-commands.js';
 
 export function registerAllCommands(program: Command, registry: EnvironmentRegistry): void {
+  registerAuthCommands(program, registry);
   registerEntityCommands(program, registry);
   registerFormViewCommands(program, registry);
   registerPluginCommands(program, registry);
