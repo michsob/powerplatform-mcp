@@ -67,13 +67,33 @@ export interface MovedSolutionComponent extends SolutionComponentRef {
   /** The components the source held under it (a table's columns, forms, views), moved with it. */
   subcomponents: SolutionComponentRef[];
   /**
-   * `rootcomponentbehavior` in each solution: 0 the table with all its subcomponents, 1 without them,
-   * 2 as a shell only; null for a component that is not a table. They differ only when the target
-   * could not take the table as the source held it.
+   * `rootcomponentbehavior` in each solution: 0 the table with all its subcomponents, 1 its metadata
+   * without them, 2 a shell; null for a component that is not a table. They differ only when the
+   * target already held the table another way.
    */
   rootComponentBehavior: { source: number | null; target: number | null };
   /** Both solutions checked after the move, so a component that needs what moved shows up. */
   missingDependencies: { source: MissingDependency[]; target: MissingDependency[] };
+}
+
+/**
+ * How much of a table a solution holds, as the maker portal offers it: `all` its columns, forms and
+ * views ("Include all objects"), its `metadata` without them ("Include table metadata"), or a `shell`
+ * that only holds the ones added one by one (neither).
+ */
+export type TableInclude = 'all' | 'metadata' | 'shell';
+
+/** `solutioncomponent.rootcomponentbehavior` for each {@link TableInclude}. */
+export const TABLE_INCLUDE_BEHAVIOR: Record<TableInclude, number> = { all: 0, metadata: 1, shell: 2 };
+
+/** A table's `rootcomponentbehavior` in words. */
+export function tableIncludeDescription(behavior: number | null | undefined): string {
+  switch (behavior) {
+    case 0: return 'with all its columns, forms and views';
+    case 1: return 'with its table metadata, without its columns, forms and views';
+    case 2: return 'as a shell, holding only the columns, forms and views added one by one';
+    default: return behavior === null || behavior === undefined ? 'not at all' : `with rootcomponentbehavior ${behavior}`;
+  }
 }
 
 interface SolutionComponentRow {
@@ -241,19 +261,33 @@ export class SolutionService {
 
   /**
    * Add a component to a solution.
+   *
+   * A table comes with all its columns, forms and views unless `include` says otherwise: `metadata`
+   * adds the table's own definition without them, `shell` only a container for them. The columns,
+   * forms and views wanted are then added one by one; adding one of a table the solution does not
+   * hold brings the table in as a shell. Adding a table the solution holds already only widens how it
+   * holds it (shell, metadata, all): Dataverse never narrows it.
+   *
    * @param solutionUniqueName The unique name of the target solution
    * @param componentId The GUID of the component
    * @param componentType Dataverse component type code (see COMPONENT_TYPE_NAMES: 1=Entity, 2=Attribute, 61=WebResource, 91=PluginAssembly, 92=SdkMessageProcessingStep, etc.)
    * @param addRequiredComponents Whether to also add required dependencies
-   * @param options.doNotIncludeSubcomponents Add a table without its columns, forms and views, which can then be added one by one
+   * @param options.include How much of a table to add (tables only); `all` by default
    */
   async addSolutionComponent(
     solutionUniqueName: string,
     componentId: string,
     componentType: number,
     addRequiredComponents: boolean = false,
-    options: { doNotIncludeSubcomponents?: boolean } = {},
+    options: { include?: TableInclude } = {},
   ): Promise<unknown> {
+    const include = options.include ?? 'all';
+    if (!(include in TABLE_INCLUDE_BEHAVIOR)) {
+      throw new Error(`include must be all, metadata or shell, not '${include}'`);
+    }
+    if (include !== 'all' && componentType !== 1) {
+      throw new Error(`include applies to a table (component type 1), not to ${componentTypeName(componentType)}`);
+    }
     return this.client.post(
       'api/data/v9.2/AddSolutionComponent',
       {
@@ -261,10 +295,25 @@ export class SolutionService {
         ComponentType: componentType,
         SolutionUniqueName: solutionUniqueName,
         AddRequiredComponents: addRequiredComponents,
-        // Sent only when asked for, so every other add is the request it always was.
-        ...(options.doNotIncludeSubcomponents ? { DoNotIncludeSubcomponents: true } : {}),
+        // Sent only when asked for, so every other add is the request it always was. No settings at
+        // all leaves the table's definition out too: what is left is the shell.
+        ...(include === 'metadata' ? { DoNotIncludeSubcomponents: true } : {}),
+        ...(include === 'shell' ? { DoNotIncludeSubcomponents: true, IncludedComponentSettingsValues: [] } : {}),
       },
     );
+  }
+
+  /**
+   * How a solution holds a table (`rootcomponentbehavior`: 0 all, 1 metadata, 2 shell), or null
+   * when it does not hold it.
+   */
+  async getTableInclude(solutionUniqueName: string, tableId: string): Promise<number | null> {
+    const solution = await this.getSolution(solutionUniqueName);
+    if (!solution) {
+      throw new Error(`Solution '${solutionUniqueName}' not found`);
+    }
+    const row = await this.findSolutionComponent(solution.solutionid as string, tableId, 1);
+    return row ? row.rootcomponentbehavior ?? null : null;
   }
 
   /**
@@ -324,7 +373,7 @@ export class SolutionService {
       async (done) => {
         await this.addSolutionComponent(
           targetSolutionUniqueName, row.objectid, row.componenttype, options.addRequiredComponents ?? false,
-          { doNotIncludeSubcomponents: behavior === 1 || behavior === 2 },
+          { include: behavior === 1 ? 'metadata' : behavior === 2 ? 'shell' : 'all' },
         );
         done(`added it to '${targetSolutionUniqueName}'`);
         for (const sub of subcomponents) {

@@ -1,5 +1,10 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { describe, expect, it } from 'vitest';
+import type { EnvironmentRegistry } from '../environment-config.js';
 import { SolutionService, missingDependencySummary } from '../services/solution-service.js';
+import { registerSolutionTools } from '../tools/solution-tools.js';
 import { fakeClient, type RecordedCall } from './fake-client.js';
 
 const CORE = { solutionid: '11111111-1111-1111-1111-111111111111', uniquename: 'Core', ismanaged: false };
@@ -83,7 +88,9 @@ function environment(options: {
         solutioncomponentid: `cccccccc-0000-0000-0000-${String(++next).padStart(12, '0')}`,
         objectid: data.ComponentId,
         componenttype: data.ComponentType,
-        rootcomponentbehavior: data.ComponentType === 1 ? (data.DoNotIncludeSubcomponents ? 1 : 0) : null,
+        rootcomponentbehavior: data.ComponentType !== 1 ? null
+          : !data.DoNotIncludeSubcomponents ? 0
+          : Array.isArray(data.IncludedComponentSettingsValues) && data.IncludedComponentSettingsValues.length === 0 ? 2 : 1,
         rootsolutioncomponentid: null,
       });
     } else if (endpoint.endsWith('RemoveSolutionComponent') && !options.ignoreRemovals) {
@@ -228,6 +235,19 @@ describe('SolutionService.moveSolutionComponent', () => {
     })]);
   });
 
+  it('keeps a shell a shell', async () => {
+    const rows = coreRows().map((r) => (r.componenttype === 1 ? { ...r, rootcomponentbehavior: 2 } : r));
+    const env = environment({ rows });
+    const result = await env.service.moveSolutionComponent('Core', 'Sales', TABLE, 1);
+
+    expect(env.posts()[0].data).toEqual({
+      ComponentId: TABLE, ComponentType: 1, SolutionUniqueName: 'Sales', AddRequiredComponents: false,
+      DoNotIncludeSubcomponents: true, IncludedComponentSettingsValues: [],
+    });
+    expect(result.rootComponentBehavior).toEqual({ source: 2, target: 2 });
+    expect(result.subcomponents.map((s) => s.componentId)).toEqual([COLUMN, FORM]);
+  });
+
   it('adds a whole table as a whole table, with its required components when asked', async () => {
     const rows = coreRows().filter((r) => r.componenttype === 1).map((r) => ({ ...r, rootcomponentbehavior: 0 }));
     const env = environment({ rows });
@@ -306,12 +326,84 @@ describe('SolutionService.getMissingDependencies', () => {
 });
 
 describe('SolutionService.addSolutionComponent', () => {
-  it('sends the request it always did unless asked to leave the subcomponents out', async () => {
+  const base = { ComponentId: TABLE, ComponentType: 1, SolutionUniqueName: 'Core', AddRequiredComponents: false };
+
+  it('adds a table all of it, its metadata, or a shell, as asked', async () => {
     const calls: RecordedCall[] = [];
     const service = new SolutionService(fakeClient([], calls));
     await service.addSolutionComponent('Core', TABLE, 1, false);
-    await service.addSolutionComponent('Core', TABLE, 1, false, { doNotIncludeSubcomponents: true });
-    expect(calls[0].data).toEqual({ ComponentId: TABLE, ComponentType: 1, SolutionUniqueName: 'Core', AddRequiredComponents: false });
-    expect(calls[1].data).toMatchObject({ DoNotIncludeSubcomponents: true });
+    await service.addSolutionComponent('Core', TABLE, 1, false, { include: 'all' });
+    await service.addSolutionComponent('Core', TABLE, 1, false, { include: 'metadata' });
+    await service.addSolutionComponent('Core', TABLE, 1, false, { include: 'shell' });
+
+    expect(calls.map((c) => c.data)).toEqual([
+      base,
+      base,
+      { ...base, DoNotIncludeSubcomponents: true },
+      { ...base, DoNotIncludeSubcomponents: true, IncludedComponentSettingsValues: [] },
+    ]);
+  });
+
+  it('refuses include for anything but a table, and an unknown include, before any request', async () => {
+    const calls: RecordedCall[] = [];
+    const service = new SolutionService(fakeClient([], calls));
+    await expect(service.addSolutionComponent('Core', COLUMN, 2, false, { include: 'shell' }))
+      .rejects.toThrow('include applies to a table (component type 1), not to Attribute');
+    await expect(service.addSolutionComponent('Core', TABLE, 1, false, { include: 'some' as never }))
+      .rejects.toThrow("include must be all, metadata or shell, not 'some'");
+    expect(calls).toHaveLength(0);
+  });
+
+  it('reads back how a solution holds a table', async () => {
+    const env = environment();
+    expect(await env.service.getTableInclude('Core', TABLE)).toBe(1);
+    expect(await env.service.getTableInclude('Sales', TABLE)).toBeNull();
+    await expect(env.service.getTableInclude('Nope', TABLE)).rejects.toThrow("Solution 'Nope' not found");
+  });
+});
+
+describe('add-solution-component (MCP)', () => {
+  async function tool(env: ReturnType<typeof environment>) {
+    const server = new McpServer({ name: 'test', version: '0.0.0' });
+    registerSolutionTools(server, { getContext: () => ({ getSolutionService: () => env.service }) } as unknown as EnvironmentRegistry);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'test-client', version: '0.0.0' });
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    return (args: Record<string, unknown>) => client.callTool({ name: 'add-solution-component', arguments: args });
+  }
+  const text = (result: Awaited<ReturnType<Client['callTool']>>) => (result.content as { text: string }[])[0].text;
+
+  it('says how the solution now holds the table', async () => {
+    const env = environment();
+    const call = await tool(env);
+
+    const result = await call({ solutionUniqueName: 'Sales', componentId: TABLE, componentType: 1, include: 'shell' });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toMatchObject({ rootComponentBehavior: 2 });
+    expect(text(result)).toBe(`Added table ${TABLE} to solution 'Sales': the solution holds it as a shell, holding only the columns, forms and views added one by one.`);
+  });
+
+  it('says so when the solution already held more of the table than asked', async () => {
+    const rows = coreRows().map((r) => (r.componenttype === 1 ? { ...r, rootcomponentbehavior: 0 } : r));
+    const env = environment({ rows });
+    // Like Dataverse: a table the solution holds is only ever widened.
+    const post = (env.service as any).client.post;
+    (env.service as any).client.post = async (endpoint: string, data: any) => {
+      if (endpoint.endsWith('AddSolutionComponent') && rows.some((r) => r.objectid === data.ComponentId && r.solutionid === CORE.solutionid)) return;
+      return post(endpoint, data);
+    };
+    const call = await tool(env);
+
+    const result = await call({ solutionUniqueName: 'Core', componentId: TABLE, componentType: 1, include: 'metadata' });
+
+    expect(text(result)).toMatch(/holds it with all its columns, forms and views\. That is not 'metadata': .* remove the table from the solution first and add it again\.$/);
+  });
+
+  it('returns a refused include as an error', async () => {
+    const call = await tool(environment());
+    const result = await call({ solutionUniqueName: 'Core', componentId: COLUMN, componentType: 2, include: 'metadata' });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toBe('Failed to add solution component: include applies to a table (component type 1), not to Attribute');
   });
 });

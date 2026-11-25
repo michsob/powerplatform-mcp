@@ -162,7 +162,7 @@ List tools stop at `maxRecords` and say so: `hasMore` is true when more rows mat
 | `get-solution` | Get solution by unique name | `uniqueName` | |
 | `get-solution-components` | List components in a solution | `solutionUniqueName` | |
 | `export-solution` | Export solution (base64) | `solutionName` | `managed` |
-| `add-solution-component` | Add a component to a solution | `solutionUniqueName`, `componentId`, `componentType` | `addRequiredComponents` |
+| `add-solution-component` | Add a component to a solution; a table all of it, its metadata or a shell (`include`), and says how the solution holds it | `solutionUniqueName`, `componentId`, `componentType` | `addRequiredComponents`, `include` |
 | `remove-solution-component` | Remove a component from an unmanaged solution; it stays in the environment. A table's columns, forms and views listed under it go with it | `solutionUniqueName`, `componentId`, `componentType` | |
 | `move-solution-component` | Move a component to another unmanaged solution as the source holds it (added to the target before it is removed from the source), then check both for missing dependencies | `sourceSolutionUniqueName`, `targetSolutionUniqueName`, `componentId`, `componentType` | `addRequiredComponents` |
 | `publish-customizations` | Publish entity or all customizations | | `entityLogicalName` |
@@ -354,11 +354,13 @@ solutions
 solution <uniqueName>
 solution-components <uniqueName>
 publishers                                 [--writable-only]
-add-solution-component <solutionUniqueName> <componentId> <componentType>  [--add-required]
+add-solution-component <solutionUniqueName> <componentId> <componentType>  [--add-required] [--include <all|metadata|shell>]
 remove-solution-component <solutionUniqueName> <componentId> <componentType>
 move-solution-component <sourceSolution> <targetSolution> <componentId> <componentType>  [--add-required]   # then lists what each solution is missing
 publish-customizations                     [--entity <logicalName>]
 ```
+
+A table goes into a solution the ways the maker portal offers: `--include all` (the default) with all its columns, forms and views, `metadata` with the table's own definition but none of them, `shell` as a container only. To put only some of a table's columns, forms or views in a solution, add each one: type 2 with the column's MetadataId (`entity-attribute`), 60 with a form's id, 26 with a view's id. Adding one of a table the solution does not hold brings the table in as a shell. Adding a table again widens how the solution holds it (shell, metadata, all) but never narrows it; to hold less, `remove-solution-component` it and add it again. `move-solution-component` keeps the way the source held it.
 
 #### Workflows
 ```
