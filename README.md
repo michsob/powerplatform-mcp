@@ -59,7 +59,9 @@ POWERPLATFORM_UAT_CLIENT_SECRET=...
 POWERPLATFORM_UAT_TENANT_ID=...
 ```
 
-For local development, copy `.env.example` to `.env` and fill in your credentials.
+The CLI and the MCP server both load `.env` from the current directory, so you can keep one per client folder and run the CLI from inside it. `DOTENV_CONFIG_PATH` points them at another file, which is handy for an MCP client that starts the server in a directory of its own. A variable already set in the environment (the shell, `docker run --env-file`, an MCP client's `env` block) wins over the file. Copy `.env.example` to `.env` to start one.
+
+Any value can be a 1Password secret reference, such as `POWERPLATFORM_DEV_CLIENT_SECRET=op://Vault/Item/credential`, so the `.env` holds no secrets. They are resolved with the [1Password CLI](https://developer.1password.com/docs/cli/) (`op`) on start, all in one `op run`, so 1Password asks once. Sign in first, through the 1Password app integration or `eval $(op signin)`, and set `OP_ACCOUNT` when more than one account is signed in. A reference that cannot be resolved stays as it is, with a warning on stderr naming the variable and saying why. A reference still holding `.env.example` text like `<vault>` is skipped.
 
 Optionally, `POWERPLATFORM_ENVIRONMENT_ID` sets the Power Platform environment id that the Flow API calls use (flow run details, cancel, resubmit). Without it, the id is looked up from Dataverse.
 
