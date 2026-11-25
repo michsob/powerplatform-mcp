@@ -413,15 +413,16 @@ export class EntityService {
     maxLength: number = 100,
     requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
     description?: string,
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
   ): Promise<{ attributeId: string }> {
+    const lcid = languageCode ?? await this.baseLanguage();
     const body: Record<string, unknown> = {
       '@odata.type': '#Microsoft.Dynamics.CRM.StringAttributeMetadata',
       SchemaName: schemaName,
       DisplayName: {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: lcid }],
       },
       RequiredLevel: { Value: requiredLevel },
       MaxLength: maxLength,
@@ -431,7 +432,7 @@ export class EntityService {
     if (description) {
       body.Description = {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: lcid }],
       };
     }
 
@@ -460,7 +461,7 @@ export class EntityService {
    * @param ownershipType 'UserOwned' or 'OrganizationOwned' (default UserOwned)
    * @param hasActivities Whether the entity tracks activities (default false)
    * @param hasNotes Whether the entity supports notes (default false)
-   * @param languageCode Language code for labels (default 1045 — Polish)
+   * @param languageCode Language code for labels (default: the organization's base language)
    * @param solutionName Optional solution unique name to add the entity to
    */
   async createEntity(
@@ -473,16 +474,17 @@ export class EntityService {
     ownershipType: 'UserOwned' | 'OrganizationOwned' = 'UserOwned',
     hasActivities: boolean = false,
     hasNotes: boolean = false,
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
   ): Promise<{ entityId: string }> {
+    const lcid = languageCode ?? await this.baseLanguage();
     const label = (text: string) => ({
       '@odata.type': 'Microsoft.Dynamics.CRM.Label',
       LocalizedLabels: [
         {
           '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel',
           Label: text,
-          LanguageCode: languageCode,
+          LanguageCode: lcid,
         },
       ],
     });
@@ -533,7 +535,7 @@ export class EntityService {
    * @param options Array of { value: number, label: string } defining a local choice's options; empty for a global choice
    * @param requiredLevel Required level
    * @param description Optional description
-   * @param languageCode Language code for labels
+   * @param languageCode Language code for labels (default: the organization's base language)
    * @param solutionName Optional solution unique name
    * @param choice.globalOptionSetName The global choice (option set) the column uses, by name
    * @param choice.defaultValue The option a new record gets (DefaultFormValue); unset leaves the platform's default
@@ -545,7 +547,7 @@ export class EntityService {
     options: { value: number; label: string }[],
     requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
     description?: string,
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
     choice: { globalOptionSetName?: string; defaultValue?: number } = {},
   ): Promise<{ attributeId: string }> {
@@ -556,9 +558,11 @@ export class EntityService {
         : 'A local choice needs at least one option.');
     }
 
+    const lcid = languageCode ?? await this.baseLanguage();
+
     const mkLabel = (text: string) => ({
       '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-      LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: text, LanguageCode: languageCode }],
+      LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: text, LanguageCode: lcid }],
     });
 
     const body: Record<string, unknown> = {
@@ -635,7 +639,7 @@ export class EntityService {
    * @param maxValue Maximum allowed value
    * @param requiredLevel Required level
    * @param description Optional description
-   * @param languageCode Language code for labels
+   * @param languageCode Language code for labels (default: the organization's base language)
    * @param solutionName Optional solution unique name
    */
   async createMoneyAttribute(
@@ -648,15 +652,16 @@ export class EntityService {
     maxValue: number = 100_000_000_000,
     requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
     description?: string,
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
   ): Promise<{ attributeId: string }> {
+    const lcid = languageCode ?? await this.baseLanguage();
     const body: Record<string, unknown> = {
       '@odata.type': 'Microsoft.Dynamics.CRM.MoneyAttributeMetadata',
       SchemaName: schemaName,
       DisplayName: {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: lcid }],
       },
       RequiredLevel: { Value: requiredLevel },
       PrecisionSource: precisionSource,
@@ -668,7 +673,7 @@ export class EntityService {
     if (description) {
       body.Description = {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: lcid }],
       };
     }
 
@@ -694,7 +699,7 @@ export class EntityService {
    * @param maxValue Maximum allowed value (default 100_000_000_000)
    * @param requiredLevel Required level
    * @param description Optional description
-   * @param languageCode Language code for labels
+   * @param languageCode Language code for labels (default: the organization's base language)
    * @param solutionName Optional solution unique name
    */
   async createDecimalAttribute(
@@ -706,15 +711,16 @@ export class EntityService {
     maxValue: number = 100_000_000_000,
     requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
     description?: string,
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
   ): Promise<{ attributeId: string }> {
+    const lcid = languageCode ?? await this.baseLanguage();
     const body: Record<string, unknown> = {
       '@odata.type': 'Microsoft.Dynamics.CRM.DecimalAttributeMetadata',
       SchemaName: schemaName,
       DisplayName: {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: lcid }],
       },
       RequiredLevel: { Value: requiredLevel },
       Precision: precision,
@@ -725,7 +731,7 @@ export class EntityService {
     if (description) {
       body.Description = {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: lcid }],
       };
     }
 
@@ -749,7 +755,7 @@ export class EntityService {
    * @param behavior 'UserLocal', 'DateOnly', or 'TimeZoneIndependent' (default 'UserLocal')
    * @param requiredLevel Required level
    * @param description Optional description
-   * @param languageCode Language code for labels
+   * @param languageCode Language code for labels (default: the organization's base language)
    * @param solutionName Optional solution unique name
    */
   async createDateTimeAttribute(
@@ -760,15 +766,16 @@ export class EntityService {
     behavior: 'UserLocal' | 'DateOnly' | 'TimeZoneIndependent' = 'UserLocal',
     requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
     description?: string,
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
   ): Promise<{ attributeId: string }> {
+    const lcid = languageCode ?? await this.baseLanguage();
     const body: Record<string, unknown> = {
       '@odata.type': '#Microsoft.Dynamics.CRM.DateTimeAttributeMetadata',
       SchemaName: schemaName,
       DisplayName: {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: lcid }],
       },
       RequiredLevel: { Value: requiredLevel },
       Format: format,
@@ -778,7 +785,7 @@ export class EntityService {
     if (description) {
       body.Description = {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: lcid }],
       };
     }
 
@@ -802,7 +809,7 @@ export class EntityService {
    * @param maxValue Maximum allowed value (default 2147483647)
    * @param requiredLevel Required level
    * @param description Optional description
-   * @param languageCode Language code for labels
+   * @param languageCode Language code for labels (default: the organization's base language)
    * @param solutionName Optional solution unique name
    */
   async createIntegerAttribute(
@@ -813,15 +820,16 @@ export class EntityService {
     maxValue: number = 2147483647,
     requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
     description?: string,
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
   ): Promise<{ attributeId: string }> {
+    const lcid = languageCode ?? await this.baseLanguage();
     const body: Record<string, unknown> = {
       '@odata.type': '#Microsoft.Dynamics.CRM.IntegerAttributeMetadata',
       SchemaName: schemaName,
       DisplayName: {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: lcid }],
       },
       RequiredLevel: { Value: requiredLevel },
       MinValue: minValue,
@@ -831,7 +839,7 @@ export class EntityService {
     if (description) {
       body.Description = {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: lcid }],
       };
     }
 
@@ -856,7 +864,7 @@ export class EntityService {
    * @param defaultValue Default value (default false)
    * @param requiredLevel Required level
    * @param description Optional description
-   * @param languageCode Language code for labels
+   * @param languageCode Language code for labels (default: the organization's base language)
    * @param solutionName Optional solution unique name
    */
   async createBooleanAttribute(
@@ -868,15 +876,16 @@ export class EntityService {
     defaultValue: boolean = false,
     requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
     description?: string,
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
   ): Promise<{ attributeId: string }> {
+    const lcid = languageCode ?? await this.baseLanguage();
     const body: Record<string, unknown> = {
       '@odata.type': '#Microsoft.Dynamics.CRM.BooleanAttributeMetadata',
       SchemaName: schemaName,
       DisplayName: {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: lcid }],
       },
       RequiredLevel: { Value: requiredLevel },
       DefaultValue: defaultValue,
@@ -885,14 +894,14 @@ export class EntityService {
           Value: 1,
           Label: {
             '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-            LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: trueLabel, LanguageCode: languageCode }],
+            LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: trueLabel, LanguageCode: lcid }],
           },
         },
         FalseOption: {
           Value: 0,
           Label: {
             '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-            LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: falseLabel, LanguageCode: languageCode }],
+            LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: falseLabel, LanguageCode: lcid }],
           },
         },
       },
@@ -901,7 +910,7 @@ export class EntityService {
     if (description) {
       body.Description = {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: lcid }],
       };
     }
 
@@ -924,7 +933,7 @@ export class EntityService {
    * @param maxLength Maximum text length (default 2000)
    * @param requiredLevel Required level
    * @param description Optional description
-   * @param languageCode Language code for labels
+   * @param languageCode Language code for labels (default: the organization's base language)
    * @param solutionName Optional solution unique name
    */
   async createMemoAttribute(
@@ -934,15 +943,16 @@ export class EntityService {
     maxLength: number = 2000,
     requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
     description?: string,
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
   ): Promise<{ attributeId: string }> {
+    const lcid = languageCode ?? await this.baseLanguage();
     const body: Record<string, unknown> = {
       '@odata.type': '#Microsoft.Dynamics.CRM.MemoAttributeMetadata',
       SchemaName: schemaName,
       DisplayName: {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: lcid }],
       },
       RequiredLevel: { Value: requiredLevel },
       MaxLength: maxLength,
@@ -952,7 +962,7 @@ export class EntityService {
     if (description) {
       body.Description = {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: lcid }],
       };
     }
 
@@ -976,7 +986,7 @@ export class EntityService {
    * @param maxSizeInKb Maximum file size in KB (default 32768 = 32 MB; Dataverse allows up to 10 GB)
    * @param requiredLevel Required level
    * @param description Optional description
-   * @param languageCode Language code for labels
+   * @param languageCode Language code for labels (default: the organization's base language)
    * @param solutionName Optional solution unique name
    */
   async createFileAttribute(
@@ -986,15 +996,16 @@ export class EntityService {
     maxSizeInKb: number = 32768,
     requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
     description?: string,
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
   ): Promise<{ attributeId: string }> {
+    const lcid = languageCode ?? await this.baseLanguage();
     const body: Record<string, unknown> = {
       '@odata.type': '#Microsoft.Dynamics.CRM.FileAttributeMetadata',
       SchemaName: schemaName,
       DisplayName: {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: lcid }],
       },
       RequiredLevel: { Value: requiredLevel },
       MaxSizeInKB: maxSizeInKb,
@@ -1003,7 +1014,7 @@ export class EntityService {
     if (description) {
       body.Description = {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: description, LanguageCode: lcid }],
       };
     }
 
@@ -1029,7 +1040,7 @@ export class EntityService {
    * @param requiredLevel Required level: 'None', 'ApplicationRequired', or 'SystemRequired'
    * @param description Optional description for the lookup column
    * @param cascadeDelete Cascade delete behavior (default 'RemoveLink' — deleting parent just nulls the lookup)
-   * @param languageCode Language code for labels (default 1045 — Polish)
+   * @param languageCode Language code for labels (default: the organization's base language)
    * @param solutionName Optional solution unique name to add the component to
    */
   async createLookupAttribute(
@@ -1041,9 +1052,10 @@ export class EntityService {
     requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
     description?: string,
     cascadeDelete: 'NoCascade' | 'RemoveLink' | 'Restrict' | 'Cascade' = 'RemoveLink',
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
   ): Promise<{ attributeId: string }> {
+    const lcid = languageCode ?? await this.baseLanguage();
     const emptyLabel = {
       '@odata.type': 'Microsoft.Dynamics.CRM.Label',
       LocalizedLabels: [] as unknown[],
@@ -1055,7 +1067,7 @@ export class EntityService {
         {
           '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel',
           Label: displayName,
-          LanguageCode: languageCode,
+          LanguageCode: lcid,
         },
       ],
     };
@@ -1074,7 +1086,7 @@ export class EntityService {
           {
             '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel',
             Label: description,
-            LanguageCode: languageCode,
+            LanguageCode: lcid,
           },
         ],
       };
@@ -1136,14 +1148,15 @@ export class EntityService {
     schemaName: string,
     displayName: string,
     keyAttributes: string[],
-    languageCode: number = 1045,
+    languageCode?: number,
     solutionName?: string,
   ): Promise<{ keyId: string }> {
+    const lcid = languageCode ?? await this.baseLanguage();
     const body = {
       SchemaName: schemaName,
       DisplayName: {
         '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: languageCode }],
+        LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: displayName, LanguageCode: lcid }],
       },
       KeyAttributes: keyAttributes,
     };
@@ -1170,8 +1183,21 @@ export class EntityService {
   }
 
   /** The organization's base language (its LCID), in which a label is set when no language is given. */
-  private async baseLanguage(): Promise<number> {
-    const result = await this.client.get<ApiCollectionResponse<{ languagecode: number }>>('api/data/v9.2/organizations?$select=languagecode');
-    return result.value?.[0]?.languagecode ?? 1033;
+  /**
+   * The organization's base language: every organization has it, so Dataverse accepts a label in it.
+   * A fixed default (it was Polish) fails on an organization without that language pack, or leaves
+   * labels nobody sees. Asked once per service; a failed lookup is not kept.
+   */
+  private baseLanguage(): Promise<number> {
+    this.baseLanguageCode ??= this.client
+      .get<ApiCollectionResponse<{ languagecode: number }>>('api/data/v9.2/organizations?$select=languagecode')
+      .then((result) => result.value?.[0]?.languagecode ?? 1033)
+      .catch((error) => {
+        this.baseLanguageCode = undefined;
+        throw error;
+      });
+    return this.baseLanguageCode;
   }
+
+  private baseLanguageCode?: Promise<number>;
 }

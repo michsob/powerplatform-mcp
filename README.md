@@ -83,7 +83,7 @@ List tools stop at `maxRecords` and say so: `hasMore` is true when more rows mat
 | `get-entity-attributes` | List all attributes/fields | `entityName` | |
 | `get-entity-attribute` | Get a specific attribute | `entityName`, `attributeName` | |
 | `get-entity-relationships` | Get 1:N and N:N relationships | `entityName` | |
-| `create-entity-string-attribute` | Create a Single Line of Text column | `entityName`, `schemaName`, `displayName` | `maxLength`, `requiredLevel`, `description`, `solutionName` |
+| `create-entity-string-attribute` | Create a Single Line of Text column | `entityName`, `schemaName`, `displayName` | `maxLength`, `requiredLevel`, `description`, `languageCode`, `solutionName` |
 | `get-entity-keys` | List alternate keys on an entity | `entityName` | |
 | `create-entity-alternate-key` | Create an alternate key | `entityName`, `schemaName`, `displayName`, `keyAttributes` | `languageCode`, `solutionName` |
 
@@ -246,7 +246,7 @@ entity-attribute <entityName> <attributeName>
 entity-relationships <entityName>
 entity-keys <entityName>
 create-entity <schemaName> <displayName> <displayCollectionName>  [--primary-name-schema <name>] [--primary-name-display <name>] [--description <desc>] [--ownership <UserOwned|OrganizationOwned>] [--has-activities] [--has-notes] [--solution <name>]
-create-entity-string-attribute <entityName> <schemaName> <displayName>  [--max-length <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
+create-entity-string-attribute <entityName> <schemaName> <displayName>  [--max-length <n>] [--required-level <level>] [--description <desc>] [--language-code <lcid>] [--solution <name>]
 create-entity-memo-attribute <entityName> <schemaName> <displayName>  [--max-length <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
 create-entity-file-attribute <entityName> <schemaName> <displayName>  [--max-size-kb <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
 create-entity-integer-attribute <entityName> <schemaName> <displayName>  [--min <n>] [--max <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
@@ -262,6 +262,8 @@ set-entity-change-tracking <entityName> <on|off>  [--solution <name>] [--no-publ
 update-entity-attribute <entityName> <attributeName>  [--required-level <None|Recommended|ApplicationRequired>] [--min <n>] [--max <n>] [--display-name <text>] [--description <text>] [--language-code <lcid>] [--solution <name>] [--no-publish]   # min/max on Integer, Decimal, Double, Money; a label is set in one language (default: the base language), the others stay
 delete-entity-attribute <entityName> <attributeName>
 ```
+
+The create commands write their labels (display names, descriptions, choice and yes/no labels) in the organization's base language, the one language every organization has. `--language-code` writes them in another installed language instead.
 
 #### Records
 ```
