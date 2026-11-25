@@ -55,6 +55,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error getting flows:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -115,6 +116,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error searching workflows:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -160,6 +162,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error getting flow definition:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -216,6 +219,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error getting flow runs:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -267,6 +271,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error getting flow run details:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -314,6 +319,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error cancelling flow run:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -362,6 +368,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error resubmitting flow run:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -415,6 +422,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error scanning flow health:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -457,6 +465,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error getting flow inventory:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",

@@ -43,6 +43,7 @@ export function registerWorkflowTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting workflows:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -85,6 +86,7 @@ export function registerWorkflowTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting workflow definition:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -130,6 +132,7 @@ export function registerWorkflowTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting OOTB workflows:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",

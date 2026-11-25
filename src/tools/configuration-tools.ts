@@ -45,6 +45,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       } catch (error: any) {
         console.error("Error getting connection references:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -100,6 +101,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       } catch (error: any) {
         console.error("Error creating environment variable:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -147,6 +149,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       } catch (error: any) {
         console.error("Error setting environment variable value:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -193,6 +196,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       } catch (error: any) {
         console.error("Error getting environment variables:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",

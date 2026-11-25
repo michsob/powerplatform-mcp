@@ -37,6 +37,7 @@ export function registerServiceEndpointTools(server: McpServer, registry: Enviro
       } catch (error: any) {
         console.error("Error getting service endpoints:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",

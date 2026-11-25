@@ -39,6 +39,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity metadata:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -83,6 +84,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity attributes:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -129,6 +131,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity attribute:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -184,6 +187,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error creating entity attribute:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -228,6 +232,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity keys:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -278,6 +283,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error creating alternate key:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -322,6 +328,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity relationships:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",

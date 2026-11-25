@@ -42,6 +42,7 @@ export function registerRecordTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting record:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
@@ -93,6 +94,7 @@ export function registerRecordTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error querying records:", error);
         return {
+          isError: true,
           content: [
             {
               type: "text",
