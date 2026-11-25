@@ -14,7 +14,8 @@ const { version } = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 ) as { version: string };
 
-const registry = new EnvironmentRegistry();
+// The CLI runs in a terminal, so an interactive environment may open the browser to sign in.
+const registry = new EnvironmentRegistry({ allowInteractive: true });
 const program = new Command();
 
 program

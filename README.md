@@ -67,6 +67,34 @@ Optionally, `POWERPLATFORM_ENVIRONMENT_ID` sets the Power Platform environment i
 
 The Flow API (api.flow.microsoft.com) refuses an app registration that has no maker access in the environment, whatever its Dataverse security roles. You'll see this as `403 EnvironmentAccessDenied`. Run lists, with each run's status and error, come from Dataverse and keep working.
 
+### Signing in as yourself (interactive)
+
+An environment can instead sign in as a person, in the browser, with that person's Dataverse access: useful where you have an account but no app registration or secret (a client's tenant, for example).
+
+```bash
+POWERPLATFORM_ENVIRONMENTS=CLIENTDEV
+
+POWERPLATFORM_CLIENTDEV_AUTH_METHOD=interactive
+POWERPLATFORM_CLIENTDEV_URL=https://client-dev.crm.dynamics.com
+POWERPLATFORM_CLIENTDEV_TENANT_ID=00000000-0000-0000-0000-000000000000
+POWERPLATFORM_CLIENTDEV_EMAIL=you@example.com        # optional: the account to use
+# POWERPLATFORM_CLIENTDEV_CLIENT_ID=...              # optional: your own public client app
+```
+
+Then sign in once with the CLI:
+
+```bash
+powerplatform-cli login --env CLIENTDEV
+```
+
+The browser opens (the URL is also printed, to open by hand). After sign-in the command prints the Dataverse user you act as. Later CLI commands and the MCP server renew the token from the cached sign-in without asking again. When the sign-in expires, the CLI opens the browser again. The MCP server never does that itself: it asks you to run `login`.
+
+- **No app registration needed.** Without `_CLIENT_ID`, the sign-in uses Microsoft's public client for Dataverse (`51f81489-12ee-4a9e-aaae-a2591f45987d`, the one the Dataverse SDK samples, the Plugin Registration Tool and XrmToolBox use). Your own public client app works too if it allows the `http://localhost` redirect URI.
+- **Which account.** Without `_EMAIL`, the browser asks which account to use, and later commands use the one account cached for the tenant. With several accounts signed in to the same tenant, set `_EMAIL`.
+- **Where the sign-in is kept.** The cache is `~/.powerplatform-mcp/token-cache/<tenant>_<client>.json`, or the folder `POWERPLATFORM_TOKEN_CACHE_DIR` names. It holds a refresh token, so it is written owner-only (0600) and kept out of the working directory, where `.pp-cache` output may sit in a repository. One sign-in serves every environment in the same tenant. `logout` removes it.
+- **pac.** `pac-auth` creates an interactive pac profile for such an environment (`pac auth create --environment <url>`), and pac then asks you to sign in.
+- **Docker.** A container has no browser. Sign in on the host and mount the cache folder (`-v ~/.powerplatform-mcp:/home/cliuser/.powerplatform-mcp`; `mcpuser` for the MCP image). Otherwise use a client secret.
+
 ## MCP Server
 
 The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilot).
@@ -242,6 +270,13 @@ Same tools as the MCP server, but results are cached to the file system for full
 A list command that stops at `--max` prints a `⚠` line saying so, with the total when Dataverse counted it. `flow-health` also warns when a flow had more runs in the window than `--max-runs` (its success rate then covers the latest runs only), when it stopped at `--max-flows`, and when a flow's runs couldn't be read.
 
 ### Commands
+
+#### Sign-in
+```
+login                                      Sign in as yourself in the browser (AUTH_METHOD=interactive); prints the Dataverse user
+logout                                     Forget the environment's cached sign-in
+whoami                                     How the environment signs in, and the Dataverse user it acts as (either method)
+```
 
 #### Entity
 ```
