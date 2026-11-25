@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { missingDependencySummary } from "../services/solution-service.js";
 
 /**
  * Register solution tools with the MCP server.
@@ -239,6 +240,131 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
             {
               type: "text",
               text: `Failed to add solution component: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  // Remove Solution Component
+  server.registerTool(
+    "remove-solution-component",
+    {
+      title: "Remove Solution Component",
+      description: "Remove a component from an unmanaged Dataverse solution. The component stays in the environment and in any other solution that holds it. A table held without all its subcomponents loses the columns, forms and views listed under it from the solution too. Refuses a managed solution and a component the solution does not hold. Use check-solution-dependencies afterwards to see whether anything left in the solution needed it.",
+      inputSchema: {
+        solutionUniqueName: z.string().describe("The unique name of the solution to remove the component from"),
+        componentId: z.string().describe("The component's id (objectid, e.g. a table's MetadataId; the id add-solution-component takes) or its solutioncomponentid; get-solution-components lists both"),
+        componentType: z.number().describe("Component type code (1=Entity, 2=Attribute, 9=OptionSet, 26=View, 29=Process, 60=SystemForm, 61=WebResource, 80=ModelDrivenApp, 90=PluginType, 91=PluginAssembly, 92=SdkMessageProcessingStep, 93=SdkMessageProcessingStepImage, 300=CanvasApp, 380=EnvironmentVariableDefinition, etc.)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        solutionUniqueName: z.string(),
+        componentId: z.string(),
+        componentType: z.number(),
+        componentTypeName: z.string(),
+        subcomponents: z.array(z.any()),
+      }),
+    },
+    async ({ solutionUniqueName, componentId, componentType, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getSolutionService();
+        const result = await service.removeSolutionComponent(solutionUniqueName, componentId, componentType);
+        const subs = result.subcomponents.length > 0
+          ? ` with the ${result.subcomponents.length} subcomponents it held under it`
+          : '';
+
+        return {
+          structuredContent: { ...result },
+          content: [
+            {
+              type: "text",
+              text: `Removed ${result.componentTypeName} ${result.componentId} from solution '${solutionUniqueName}'${subs}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error removing solution component:", error);
+        // isError, or the SDK replaces the message with "no structured content" for a tool with an output schema.
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to remove solution component: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  // Move Solution Component
+  server.registerTool(
+    "move-solution-component",
+    {
+      title: "Move Solution Component",
+      description: "Move a component from one unmanaged Dataverse solution to another, then check both solutions for missing dependencies (required components a solution does not include). The target gets the component as the source holds it: a table with or without all its subcomponents, plus the columns, forms and views listed under it. It is added to the target before it is removed from the source, so a failed step leaves it in both solutions, never in neither. The component itself is not changed.",
+      inputSchema: {
+        sourceSolutionUniqueName: z.string().describe("The unique name of the solution that holds the component now"),
+        targetSolutionUniqueName: z.string().describe("The unique name of the solution to move it to"),
+        componentId: z.string().describe("The component's id (objectid, e.g. a table's MetadataId) or its solutioncomponentid in the source solution; get-solution-components lists both"),
+        componentType: z.number().describe("Component type code (1=Entity, 2=Attribute, 9=OptionSet, 26=View, 29=Process, 60=SystemForm, 61=WebResource, 80=ModelDrivenApp, 90=PluginType, 91=PluginAssembly, 92=SdkMessageProcessingStep, 93=SdkMessageProcessingStepImage, 300=CanvasApp, 380=EnvironmentVariableDefinition, etc.)"),
+        addRequiredComponents: z.boolean().optional().describe("Also add to the target the components this one requires (default: false)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        sourceSolutionUniqueName: z.string(),
+        targetSolutionUniqueName: z.string(),
+        componentId: z.string(),
+        componentType: z.number(),
+        componentTypeName: z.string(),
+        subcomponents: z.array(z.any()),
+        rootComponentBehavior: z.object({ source: z.number().nullable(), target: z.number().nullable() }),
+        missingDependencies: z.object({ source: z.array(z.any()), target: z.array(z.any()) }),
+      }),
+    },
+    async ({ sourceSolutionUniqueName, targetSolutionUniqueName, componentId, componentType, addRequiredComponents, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getSolutionService();
+        const result = await service.moveSolutionComponent(
+          sourceSolutionUniqueName, targetSolutionUniqueName, componentId, componentType,
+          { addRequiredComponents: addRequiredComponents ?? false },
+        );
+        const behavior = result.rootComponentBehavior;
+        const subs = result.subcomponents.length > 0
+          ? ` with the ${result.subcomponents.length} subcomponents it held under it`
+          : '';
+
+        const lines = [
+          `Moved ${result.componentTypeName} ${result.componentId} from '${sourceSolutionUniqueName}' to '${targetSolutionUniqueName}'${subs}.`,
+          ...(behavior.source !== behavior.target
+            ? [`⚠ The target holds it with rootcomponentbehavior ${behavior.target}; the source held it with ${behavior.source}.`]
+            : []),
+          '',
+          'Missing dependencies after the move:',
+          ...missingDependencySummary(sourceSolutionUniqueName, result.missingDependencies.source),
+          ...missingDependencySummary(targetSolutionUniqueName, result.missingDependencies.target),
+          '',
+          JSON.stringify(result, null, 2),
+        ];
+
+        return {
+          structuredContent: { ...result },
+          content: [{ type: "text", text: lines.join('\n') }],
+        };
+      } catch (error: any) {
+        console.error("Error moving solution component:", error);
+        // isError, or the SDK replaces the message with "no structured content" for a tool with an output schema.
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to move solution component: ${error.message}`,
             },
           ],
         };

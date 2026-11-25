@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
-import { componentTypeName } from '../../services/solution-service.js';
+import { componentTypeName, missingDependencySummary } from '../../services/solution-service.js';
 
 export function registerSolutionCommands(program: Command, registry: EnvironmentRegistry): void {
   program
@@ -106,6 +106,62 @@ export function registerSolutionCommands(program: Command, registry: Environment
           `  Component ID: ${componentId}`,
           `  Component Type: ${componentType}`,
           `  Add Required: ${opts.addRequired ?? false}`,
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('remove-solution-component <solutionUniqueName> <componentId> <componentType>')
+    .description('Remove a component from an unmanaged solution (the component stays in the environment)')
+    .action(async (solutionUniqueName: string, componentId: string, componentType: string, _opts: unknown, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getSolutionService();
+      const result = await service.removeSolutionComponent(solutionUniqueName, componentId, parseInt(componentType, 10));
+
+      outputResult({
+        fileName: `remove-component-${solutionUniqueName}-${result.componentId}`,
+        data: result,
+        summary: [
+          `Removed component from solution '${solutionUniqueName}':`,
+          `  Component: ${result.componentTypeName} ${result.componentId}`,
+          ...(result.subcomponents.length > 0
+            ? [`  Subcomponents removed with it: ${result.subcomponents.length}`]
+            : []),
+        ].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('move-solution-component <sourceSolution> <targetSolution> <componentId> <componentType>')
+    .description('Move a component from one unmanaged solution to another, then check both for missing dependencies')
+    .option('--add-required', 'Also add to the target the components this one requires')
+    .action(async (sourceSolution: string, targetSolution: string, componentId: string, componentType: string, opts: {
+      addRequired?: boolean;
+    }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getSolutionService();
+      const result = await service.moveSolutionComponent(
+        sourceSolution, targetSolution, componentId, parseInt(componentType, 10),
+        { addRequiredComponents: opts.addRequired ?? false },
+      );
+      const behavior = result.rootComponentBehavior;
+
+      outputResult({
+        fileName: `move-component-${sourceSolution}-${targetSolution}-${result.componentId}`,
+        data: result,
+        summary: [
+          `Moved component from '${sourceSolution}' to '${targetSolution}':`,
+          `  Component: ${result.componentTypeName} ${result.componentId}`,
+          ...(result.subcomponents.length > 0
+            ? [`  Subcomponents moved with it: ${result.subcomponents.length}`]
+            : []),
+          ...(behavior.source !== behavior.target
+            ? [`  ⚠ The target holds it with rootcomponentbehavior ${behavior.target}; the source held it with ${behavior.source}`]
+            : []),
+          '',
+          'Missing dependencies after the move:',
+          ...missingDependencySummary(sourceSolution, result.missingDependencies.source).map((l) => `  ${l}`),
+          ...missingDependencySummary(targetSolution, result.missingDependencies.target).map((l) => `  ${l}`),
         ].join('\n'),
       }, ctx.environmentName);
     });

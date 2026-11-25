@@ -133,6 +133,8 @@ List tools stop at `maxRecords` and say so: `hasMore` is true when more rows mat
 | `get-solution-components` | List components in a solution | `solutionUniqueName` | |
 | `export-solution` | Export solution (base64) | `solutionName` | `managed` |
 | `add-solution-component` | Add a component to a solution | `solutionUniqueName`, `componentId`, `componentType` | `addRequiredComponents` |
+| `remove-solution-component` | Remove a component from an unmanaged solution; it stays in the environment. A table's columns, forms and views listed under it go with it | `solutionUniqueName`, `componentId`, `componentType` | |
+| `move-solution-component` | Move a component to another unmanaged solution as the source holds it (added to the target before it is removed from the source), then check both for missing dependencies | `sourceSolutionUniqueName`, `targetSolutionUniqueName`, `componentId`, `componentType` | `addRequiredComponents` |
 | `publish-customizations` | Publish entity or all customizations | | `entityLogicalName` |
 
 #### Workflows (Classic)
@@ -206,8 +208,9 @@ Each item in `privileges[]` is `{ privilegeId, depth, businessUnitId? }`. Depth 
 
 | Tool | Description | Required Params |
 |------|-------------|-----------------|
-| `check-component-dependencies` | Dependencies blocking deletion | `componentId`, `componentType` |
+| `check-component-dependencies` | Dependencies blocking deletion from the environment | `componentId`, `componentType` |
 | `check-delete-eligibility` | Check if a component can be deleted | `componentId`, `componentType` |
+| `check-solution-dependencies` | Components a solution's components require but the solution does not include (`RetrieveMissingDependencies`) | `solutionUniqueName` |
 
 #### Service Endpoints
 
@@ -313,6 +316,8 @@ solution <uniqueName>
 solution-components <uniqueName>
 publishers                                 [--writable-only]
 add-solution-component <solutionUniqueName> <componentId> <componentType>  [--add-required]
+remove-solution-component <solutionUniqueName> <componentId> <componentType>
+move-solution-component <sourceSolution> <targetSolution> <componentId> <componentType>  [--add-required]   # then lists what each solution is missing
 publish-customizations                     [--entity <logicalName>]
 ```
 
@@ -336,7 +341,8 @@ optionset <optionSetName>
 
 #### Dependencies
 ```
-check-dependencies <componentId> <componentType>
+check-dependencies <componentId> <componentType>   # before deleting a component from the environment
+check-solution-dependencies <solutionUniqueName>  # what the solution's components require that it does not include
 ```
 
 #### Configuration
